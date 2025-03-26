@@ -711,13 +711,121 @@ def extract_all_sections(markdown_content, source_file=None):
     
     return results
 
+def process_file(file_path):
+    """Process a single file and return results"""
+    try:
+        console.print(f"[dim]Preparing sheets for {os.path.basename(file_path)}...[/dim]")
+        all_sheet_markdowns = prepare_excel_sheets_markdown(file_path)
+        
+        if not all_sheet_markdowns:
+            console.print(Panel(
+                "[red]No sheets found to process[/red]",
+                title="Error",
+                border_style="red"
+            ))
+            return None, 0, 0
+
+        extraction_results = {}
+        sheets_processed = 0
+        fields_extracted = 0
+        
+        for sheet_name, markdown_content in all_sheet_markdowns.items():
+            console.print(f"[dim]Extracting data from {sheet_name}...[/dim]")
+            sheet_results = extract_all_sections(markdown_content, file_path)
+            if sheet_results:
+                extraction_results[sheet_name] = sheet_results
+                sheets_processed += 1
+                fields_extracted += sum(
+                    len([v for v in section.values() if v is not None])
+                    for section in sheet_results.values()
+                )
+        
+        return extraction_results, sheets_processed, fields_extracted
+        
+    except Exception as e:
+        console.print(Panel(
+            f"[red]Error processing {os.path.basename(file_path)}[/red]\n"
+            f"[yellow]{type(e).__name__}: {str(e)}[/yellow]",
+            border_style="red"
+        ))
+        return None, 0, 0
+
+def process_directory(directory_path):
+    """Process all Excel/CSV files in a directory sequentially"""
+    # Create json_outputs directory if it doesn't exist
+    os.makedirs("json_outputs", exist_ok=True)
+    
+    # Find all Excel/CSV files
+    all_files = []
+    for root, _, files in os.walk(directory_path):
+        for file in files:
+            if file.endswith(('.xlsx', '.xls', '.csv')):
+                all_files.append(os.path.join(root, file))
+
+    if not all_files:
+        console.print(Panel(
+            "[yellow]No Excel/CSV files found in directory[/yellow]",
+            border_style="yellow"
+        ))
+        return
+
+    total_files = len(all_files)
+    success_count = 0
+    error_count = 0
+
+    # Process files sequentially
+    console.print(Panel("[bold]Starting Directory Processing[/bold]", border_style="blue"))
+    
+    for file_path in all_files:
+        file_name = os.path.basename(file_path)
+        
+        # Show current file being processed
+        console.print(f"[cyan]Processing file: {file_name}[/cyan]")
+        
+        try:
+            # Process file and get results
+            results, sheets_processed, fields_extracted = process_file(file_path)
+            
+            if results is not None:
+                console.print(Panel(
+                    f"[green]Successfully processed {file_name}[/green]\n"
+                    f"• Sheets: [cyan]{sheets_processed}[/cyan]\n"
+                    f"• Fields: [cyan]{fields_extracted}[/cyan]",
+                    border_style="green"
+                ))
+                success_count += 1
+            else:
+                console.print(Panel(
+                    f"[yellow]No data extracted from {file_name}[/yellow]",
+                    border_style="yellow"
+                ))
+                error_count += 1
+            
+        except Exception as e:
+            console.print(Panel(
+                f"[red]Error processing {file_name}:[/red]\n"
+                f"[yellow]{type(e).__name__}: {str(e)}[/yellow]",
+                border_style="red"
+            ))
+            error_count += 1
+
+    # Show final summary
+    console.print(Panel(
+        f"[bold]Processing Summary:[/bold]\n"
+        f"• Files processed: [cyan]{total_files}[/cyan]\n"
+        f"• Successful: [green]{success_count}[/green]\n"
+        f"• Errors: [red]{error_count}[/red]",
+        title="[bold]Results[/bold]",
+        border_style="blue"
+    ))
+
 def main():
     """Main execution function with rich formatting"""
     try:
         # Print fancy header
         console.print(Panel.fit(
             "[bold green]Excel Header Mapper[/bold green]",
-            subtitle="[dim]Processing Excel files to extract structured data[/dim]",
+            subtitle="[dim]Process files or directories to extract structured data[/dim]",
             border_style="green",
             padding=(1, 2)
         ))
@@ -732,91 +840,17 @@ def main():
             border_style="blue",
             expand=False
         ))
+
+        # Hardcoded input directory path
+        input_dir = "testing"
         
-        # First, prepare all sheets as markdown
-        file_path = 'Fluxs - AI Training/8206743_COUPONS pour externe.2025.01.27 - copy.xlsx'
-        
-        with console.status("[bold green]Preparing sheets...[/]", spinner="dots"):
-            all_sheet_markdowns = prepare_excel_sheets_markdown(file_path)
-            
-        # Create json_outputs directory if it doesn't exist
-        os.makedirs("json_outputs", exist_ok=True)
-        
-        if not all_sheet_markdowns:
+        if os.path.isdir(input_dir):
+            process_directory(input_dir)
+        else:
             console.print(Panel(
-                "[red]No sheets found to process[/red]",
-                title="Error",
+                f"[red]Directory not found: {input_dir}[/red]",
                 border_style="red"
             ))
-            return
-
-        # Now process each sheet with the new extraction system
-        extraction_results = {}
-        for sheet_name, markdown_content in all_sheet_markdowns.items():
-            console.print(Panel.fit(
-                f"[bold cyan]PROCESSING SHEET: {sheet_name}[/bold cyan]",
-                border_style="blue",
-                padding=(1, 2)
-            ))
-            
-            # Print a preview of the markdown content
-            console.print(Panel(
-                Markdown(f"## Data Preview for '{sheet_name}'\n\n" + 
-                        (markdown_content[:300] + "..." if len(markdown_content) > 300 else markdown_content)),
-                title="Data Preview",
-                border_style="green",
-                expand=False
-            ))
-            
-            # Extract all sections for this sheet
-            with console.status(f"[bold]Extracting data from {sheet_name}...[/]", spinner="dots"):
-                sheet_results = extract_all_sections(markdown_content, file_path)
-            
-            # Store the results
-            extraction_results[sheet_name] = sheet_results
-            
-            # Print LLM response details for this sheet
-            console.print("\n[bold]LLM Response Details:[/bold]")
-            for section_name, data in sheet_results.items():
-                if data:
-                    console.print(f"\n[cyan]{section_name}:[/cyan]")
-                    for field, value in data.items():
-                        if value:
-                            console.print(f"  - {field}: [green]{value}[/green]")
-
-        # Print final summary
-        final_table = Table(
-            title="[bold green]Final Processing Summary[/bold green]",
-            show_header=True,
-            header_style="bold magenta",
-            expand=True
-        )
-        final_table.add_column("Sheet Name", style="cyan")
-        final_table.add_column("Sections Processed", justify="right")
-        final_table.add_column("Status", justify="center")
-
-        for sheet_name, results in extraction_results.items():
-            sections_with_data = len([s for s, d in results.items() if d])
-            status = "[green]✓ Success[/green]" if sections_with_data > 0 else "[yellow]⚠ No Data[/yellow]"
-            final_table.add_row(
-                sheet_name,
-                f"{sections_with_data}/{len(EXTRACTION_MODELS)}",
-                status
-            )
-
-        console.print(Panel(
-            final_table,
-            title=f"Processed [bold]{len(extraction_results)}[/bold] sheets",
-            border_style="blue",
-            padding=(1, 2)
-        ))
-        
-        # Print completion message
-        console.print(Panel(
-            "[bold green]✓ Processing completed successfully[/bold green]",
-            border_style="green",
-            padding=(1, 2)
-        ))
         
     except Exception as e:
         console.print(Panel(
