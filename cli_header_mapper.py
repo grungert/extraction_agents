@@ -7,6 +7,7 @@
 #   "typer>=0.4.0",
 #   "langchain>=0.1.0",
 #   "langchain-core>=0.1.0",
+#   "langchain-openai>=0.1.0",
 #   "xlrd >= 2.0.1",
 #   "markitdown[all] >= 0.1.0"
 # ]
@@ -18,6 +19,7 @@ from rich.progress import track
 from rich.markdown import Markdown
 from rich.live import Live
 from rich import print as rprint
+import json
 
 # Initialize rich console
 console = Console()
@@ -173,11 +175,11 @@ for example in examples:
 
 # Configure to use local LLM server
 llm = ChatOpenAI(
-    model_name="deepseek-r1-distill-llama-8b",
+    model_name="gemma-3-12b-it",
     base_url="http://localhost:1234/v1",
     api_key="null",
-    temperature=0.7,
-    max_retries=2,
+    temperature=0.3,
+    max_retries=2
 )
 
 runnable = prompt | llm.with_structured_output(
@@ -525,11 +527,6 @@ class CharacteristicsModel(BaseExtraction):
 EXTRACTION_MODELS = {
     "Context": ContextModel,
     "Identifier": IdentifierModel, 
-    "Denomination": DenominationModel,
-    "Valorisation": ValorisationModel,
-    "MarketCap": MarketCapModel,
-    "CorporateAction": CorporateActionModel,
-    "Characteristics": CharacteristicsModel
 }
 
 def extract_section(markdown_content, section_name, model_class):
@@ -579,13 +576,17 @@ def extract_section(markdown_content, section_name, model_class):
     except Exception as e:
         return None
 
-def extract_all_sections(markdown_content):
+def extract_all_sections(markdown_content, source_file=None):
     """Extract all sections and combine them into a complete result"""
     results = {}
     progress = {}
 
-    # Initialize progress tracking
-    for section_name in EXTRACTION_MODELS.keys():
+    # Initialize all sections with complete field structure
+    for section_name, model_class in EXTRACTION_MODELS.items():
+        # Create empty instance to get all fields
+        empty_instance = model_class()
+        results[section_name] = {k: None for k in empty_instance.model_fields.keys()}
+        
         progress[section_name] = {
             "status": "pending",
             "fields": 0
@@ -613,9 +614,12 @@ def extract_all_sections(markdown_content):
                 section_result = extract_section(markdown_content, section_name, model_class)
                 
                 if section_result:
-                    result_data = section_result.model_dump(exclude_none=True)
-                    fields_with_values = len([k for k, v in result_data.items() if v])
-                    results[section_name] = result_data
+                    result_data = section_result.model_dump()
+                    # Update only fields that have values
+                    for field, value in result_data.items():
+                        if value is not None:
+                            results[section_name][field] = value
+                    fields_with_values = len([v for v in result_data.values() if v is not None])
                     progress[section_name] = {
                         "status": "[green]Success[/green]",
                         "fields": fields_with_values
@@ -684,6 +688,27 @@ def extract_all_sections(markdown_content):
                 if value:
                     console.print(f"  - {field}: [green]{value}[/green]")
     
+    # Save results to JSON file if source file is provided
+    if source_file:
+        try:
+            # Create json_outputs directory if it doesn't exist
+            os.makedirs("json_outputs", exist_ok=True)
+            
+            # Generate output filename
+            base_name = os.path.basename(source_file)
+            json_filename = f"json_outputs/{base_name}.json"
+            
+            # Verify and save results to JSON
+            if results and any(results.values()):
+                with open(json_filename, 'w', encoding='utf-8') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                console.print(f"\n[green]Saved results to {json_filename}[/green]")
+            else:
+                console.print(f"\n[yellow]No valid results to save for {json_filename}[/yellow]")
+                
+        except Exception as e:
+            console.print(f"[red]Error saving JSON output: {str(e)}[/red]")
+    
     return results
 
 def main():
@@ -709,10 +734,13 @@ def main():
         ))
         
         # First, prepare all sheets as markdown
-        file_path = '../Fluxs - AI Training/8206743_COUPONS pour externe.2025.01.27 - copy.xlsx'
+        file_path = 'Fluxs - AI Training/8206743_COUPONS pour externe.2025.01.27 - copy.xlsx'
         
         with console.status("[bold green]Preparing sheets...[/]", spinner="dots"):
             all_sheet_markdowns = prepare_excel_sheets_markdown(file_path)
+            
+        # Create json_outputs directory if it doesn't exist
+        os.makedirs("json_outputs", exist_ok=True)
         
         if not all_sheet_markdowns:
             console.print(Panel(
@@ -742,7 +770,7 @@ def main():
             
             # Extract all sections for this sheet
             with console.status(f"[bold]Extracting data from {sheet_name}...[/]", spinner="dots"):
-                sheet_results = extract_all_sections(markdown_content)
+                sheet_results = extract_all_sections(markdown_content, file_path)
             
             # Store the results
             extraction_results[sheet_name] = sheet_results
