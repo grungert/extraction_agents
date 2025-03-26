@@ -15,16 +15,150 @@
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.progress import track
+from rich.progress import track, Progress, TextColumn, BarColumn, TimeElapsedColumn, TimeRemainingColumn, SpinnerColumn
 from rich.markdown import Markdown
 from rich.live import Live
+from rich.status import Status
 from rich import print as rprint
 import json
+import time
+from datetime import datetime, timedelta
+from functools import wraps
+import statistics
+from contextlib import contextmanager
+
+# Timing and progress tracking utilities
+class ProcessingStats:
+    """Track processing statistics for files and sheets"""
+    def __init__(self):
+        self.start_time = time.time()
+        self.file_times = {}
+        self.sheet_times = {}
+        self.field_counts = {}
+        self.success_count = 0
+        self.error_count = 0
+        self.total_fields_extracted = 0
+        
+    def record_file_start(self, file_path):
+        """Record the start time for a file"""
+        self.file_times[file_path] = {"start": time.time(), "end": None, "duration": None}
+        
+    def record_file_end(self, file_path, success=True, fields_extracted=0):
+        """Record the end time and status for a file"""
+        if file_path in self.file_times:
+            end_time = time.time()
+            self.file_times[file_path]["end"] = end_time
+            self.file_times[file_path]["duration"] = end_time - self.file_times[file_path]["start"]
+            self.file_times[file_path]["success"] = success
+            self.file_times[file_path]["fields_extracted"] = fields_extracted
+            
+            if success:
+                self.success_count += 1
+                self.total_fields_extracted += fields_extracted
+            else:
+                self.error_count += 1
+    
+    def record_sheet_time(self, file_path, sheet_name, duration, fields_extracted=0):
+        """Record processing time for a sheet"""
+        if file_path not in self.sheet_times:
+            self.sheet_times[file_path] = {}
+        
+        self.sheet_times[file_path][sheet_name] = {
+            "duration": duration,
+            "fields_extracted": fields_extracted
+        }
+        
+    def get_average_file_time(self):
+        """Get the average processing time per file"""
+        durations = [data["duration"] for data in self.file_times.values() 
+                    if data["duration"] is not None]
+        return statistics.mean(durations) if durations else 0
+    
+    def get_estimated_time_remaining(self, files_remaining):
+        """Estimate remaining time based on average processing time"""
+        avg_time = self.get_average_file_time()
+        return avg_time * files_remaining
+    
+    def get_total_duration(self):
+        """Get total processing duration so far"""
+        return time.time() - self.start_time
+    
+    def get_summary(self):
+        """Get a summary of processing statistics"""
+        total_files = self.success_count + self.error_count
+        success_rate = (self.success_count / total_files * 100) if total_files > 0 else 0
+        
+        return {
+            "total_duration": self.get_total_duration(),
+            "total_files": total_files,
+            "success_count": self.success_count,
+            "error_count": self.error_count,
+            "success_rate": success_rate,
+            "total_fields_extracted": self.total_fields_extracted,
+            "avg_fields_per_file": (self.total_fields_extracted / self.success_count) 
+                                   if self.success_count > 0 else 0
+        }
+
+def time_function(func):
+    """Decorator to measure and print execution time of a function"""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        duration = end_time - start_time
+        
+        # Format duration nicely
+        if duration < 1:
+            formatted_time = f"{duration*1000:.2f} ms"
+        elif duration < 60:
+            formatted_time = f"{duration:.2f} seconds"
+        else:
+            minutes = int(duration // 60)
+            seconds = duration % 60
+            formatted_time = f"{minutes} min {seconds:.2f} sec"
+            
+        console.print(f"[dim]Function {func.__name__} completed in {formatted_time}[/dim]")
+        return result
+    return wrapper
+
+@contextmanager
+def timed_section(description):
+    """Context manager to time a section of code without using Status (to avoid display conflicts)"""
+    console.print(f"[bold blue]{description}...[/bold blue]")
+    start_time = time.time()
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        
+        # Format duration nicely
+        if duration < 1:
+            formatted_time = f"{duration*1000:.2f} ms"
+        elif duration < 60:
+            formatted_time = f"{duration:.2f} seconds"
+        else:
+            minutes = int(duration // 60)
+            seconds = duration % 60
+            formatted_time = f"{minutes} min {seconds:.2f} sec"
+        
+        console.print(f"[green]✓[/green] {description} completed in {formatted_time}")
+
+def format_time_delta(seconds):
+    """Format seconds into a human-readable time string"""
+    if seconds < 60:
+        return f"{seconds:.1f} seconds"
+    elif seconds < 3600:
+        minutes = seconds / 60
+        return f"{minutes:.1f} minutes"
+    else:
+        hours = seconds / 3600
+        return f"{hours:.1f} hours"
 
 # Initialize rich console
 console = Console()
 import uuid
-from typing import Dict, List, TypedDict, Optional
+from typing import Dict, List, TypedDict, Optional, Callable, Any
 import tempfile
 import os
 from markitdown import MarkItDown
@@ -337,9 +471,11 @@ def process_excel_sheets_individually(file_path, start_row=0, end_row=15):
         xls = pd.ExcelFile(file_path)
         sheet_names = xls.sheet_names
         
-        # Process each sheet individually
-        for sheet_name in track(sheet_names, description="Processing sheets..."):
-            console.print(Panel(f"[bold]Sheet: [cyan]{sheet_name}[/cyan]", expand=False))
+        # Process each sheet individually without using track
+        console.print(f"[bold]Processing {len(sheet_names)} sheets individually...[/bold]")
+        
+        for sheet_idx, sheet_name in enumerate(sheet_names):
+            console.print(f"[dim]Sheet {sheet_idx+1}/{len(sheet_names)}: [cyan]{sheet_name}[/cyan][/dim]")
             
             # Read data from this sheet
             df = pd.read_excel(file_path, sheet_name=sheet_name,
@@ -348,7 +484,7 @@ def process_excel_sheets_individually(file_path, start_row=0, end_row=15):
             
             # Skip empty sheets
             if df.empty:
-                console.print(f"[yellow]Sheet '{sheet_name}' is empty - skipping[/yellow]")
+                console.print(f"  [yellow]⚠[/yellow] Sheet '{sheet_name}' is empty - skipping")
                 continue
             
             # Create a temporary file
@@ -368,16 +504,18 @@ def process_excel_sheets_individually(file_path, start_row=0, end_row=15):
             os.unlink(temp_path)
             
             # Process this individual sheet with the LLM
-            console.print(f"[blue]Running extraction on sheet: {sheet_name}[/blue]")
+            console.print(f"  [blue]Running extraction on sheet: {sheet_name}...[/blue]")
             sheet_result = runnable.invoke(
                 {
                     "text": sheet_markdown,
                     "examples": messages,
                 }
             )
+            console.print(f"  [green]✓[/green] Extraction completed for sheet: {sheet_name}")
             
             # Store the result for this sheet
             results[sheet_name] = sheet_result
+            console.print(f"  [green]✓[/green] Processed sheet '{sheet_name}'")
     else:
         raise ValueError("Unsupported file format. Please provide a .csv, .xls, or .xlsx file.")
     
@@ -417,12 +555,11 @@ def prepare_excel_sheets_markdown(file_path, start_row=0, end_row=15):
         xls = pd.ExcelFile(file_path)
         sheet_names = xls.sheet_names
         
-        # Process each sheet individually
-        for sheet_name in track(sheet_names, description="Converting sheets..."):
-            console.print(Panel(
-                f"[bold]Reading sheet: [cyan]{sheet_name}[/cyan] (rows {start_row} to {end_row-1})",
-                expand=False
-            ))
+        # Process each sheet individually without using track
+        console.print(f"[bold]Converting {len(sheet_names)} sheets to markdown...[/bold]")
+        
+        for sheet_idx, sheet_name in enumerate(sheet_names):
+            console.print(f"[dim]Sheet {sheet_idx+1}/{len(sheet_names)}: [cyan]{sheet_name}[/cyan] (rows {start_row} to {end_row-1})[/dim]")
             
             # Read data from this sheet
             df = pd.read_excel(file_path, sheet_name=sheet_name,
@@ -431,7 +568,7 @@ def prepare_excel_sheets_markdown(file_path, start_row=0, end_row=15):
             
             # Skip empty sheets
             if df.empty:
-                console.print(f"[yellow]Sheet '{sheet_name}' is empty - skipping[/yellow]")
+                console.print(f"  [yellow]⚠[/yellow] Sheet '{sheet_name}' is empty - skipping")
                 continue
             
             # Create a temporary file
@@ -452,7 +589,7 @@ def prepare_excel_sheets_markdown(file_path, start_row=0, end_row=15):
             
             # Store just the markdown content
             sheet_markdowns[sheet_name] = sheet_markdown
-            console.print(f"[green]Converted sheet '{sheet_name}' to markdown[/green]")
+            console.print(f"  [green]✓[/green] Converted sheet '{sheet_name}' to markdown")
     else:
         raise ValueError("Unsupported file format. Please provide a .csv, .xls, or .xlsx file.")
     
@@ -579,7 +716,7 @@ def extract_section(markdown_content, section_name, model_class):
 def extract_all_sections(markdown_content, source_file=None):
     """Extract all sections and combine them into a complete result"""
     results = {}
-    progress = {}
+    section_stats = {}
 
     # Initialize all sections with complete field structure
     for section_name, model_class in EXTRACTION_MODELS.items():
@@ -587,109 +724,100 @@ def extract_all_sections(markdown_content, source_file=None):
         empty_instance = model_class()
         results[section_name] = {k: None for k in empty_instance.model_fields.keys()}
         
-        progress[section_name] = {
+        # Initialize section stats
+        section_stats[section_name] = {
             "status": "pending",
-            "fields": 0
+            "fields": 0,
+            "start_time": None,
+            "duration": None
         }
 
-    # Create progress table
-    progress_table = Table(
-        show_header=True, 
-        header_style="bold magenta",
-        expand=True
-    )
-    progress_table.add_column("Section", style="cyan", no_wrap=True)
-    progress_table.add_column("Status", width=12)
-    progress_table.add_column("Fields", justify="right")
-
-    # Create live display for progress
-    with Live(progress_table, refresh_per_second=4) as live:
-        for section_name, model_class in EXTRACTION_MODELS.items():
-            # Update status to processing
-            progress[section_name]["status"] = "[yellow]Processing[/yellow]"
-            live.update(progress_table)
+    # Process each section without using Live display
+    console.print("[bold]Extracting data sections...[/bold]")
+    
+    for section_name, model_class in EXTRACTION_MODELS.items():
+        # Show current section being processed
+        console.print(f"[dim]Processing section: [cyan]{section_name}[/cyan][/dim]")
+        
+        # Record start time
+        section_stats[section_name]["start_time"] = time.time()
+        
+        try:
+            # Run extraction without Status indicator
+            console.print(f"  [blue]Extracting {section_name} data...[/blue]")
+            section_result = extract_section(markdown_content, section_name, model_class)
             
-            try:
-                # Run extraction
-                section_result = extract_section(markdown_content, section_name, model_class)
+            if section_result:
+                result_data = section_result.model_dump()
+                # Update only fields that have values
+                for field, value in result_data.items():
+                    if value is not None:
+                        results[section_name][field] = value
                 
-                if section_result:
-                    result_data = section_result.model_dump()
-                    # Update only fields that have values
-                    for field, value in result_data.items():
-                        if value is not None:
-                            results[section_name][field] = value
-                    fields_with_values = len([v for v in result_data.values() if v is not None])
-                    progress[section_name] = {
-                        "status": "[green]Success[/green]",
-                        "fields": fields_with_values
-                    }
-                else:
-                    results[section_name] = {}
-                    progress[section_name] = {
-                        "status": "[yellow]No Data[/yellow]",
-                        "fields": 0
-                    }
+                # Count fields with values
+                fields_with_values = len([v for v in result_data.values() if v is not None])
                 
-            except Exception as e:
-                results[section_name] = {}
-                progress[section_name] = {
-                    "status": f"[red]Error[/red]",
-                    "fields": 0
-                }
-                console.print(f"[red]Error in {section_name}: {str(e)}[/red]")
+                # Update section stats
+                section_stats[section_name].update({
+                    "status": "success",
+                    "fields": fields_with_values,
+                    "duration": time.time() - section_stats[section_name]["start_time"]
+                })
+                
+                # Show success indicator
+                console.print(f"  [green]✓[/green] Section [cyan]{section_name}[/cyan]: {fields_with_values} fields extracted")
+            else:
+                # Update section stats for no data
+                section_stats[section_name].update({
+                    "status": "no_data",
+                    "fields": 0,
+                    "duration": time.time() - section_stats[section_name]["start_time"]
+                })
+                console.print(f"  [yellow]⚠[/yellow] Section [cyan]{section_name}[/cyan]: No data extracted")
             
-            # Update progress table
-            progress_table = Table(
-                title="[bold]Extraction Progress[/bold]", 
-                show_header=True, 
-                header_style="bold magenta",
-                expand=True
-            )
-            progress_table.add_column("Section", style="cyan", no_wrap=True)
-            progress_table.add_column("Status", width=12)
-            progress_table.add_column("Fields", justify="right")
-            
-            for name, data in progress.items():
-                progress_table.add_row(
-                    name,
-                    data["status"],
-                    str(data["fields"])
-                )
-            
-            live.update(progress_table)
+        except Exception as e:
+            # Update section stats for error
+            section_stats[section_name].update({
+                "status": "error",
+                "fields": 0,
+                "duration": time.time() - section_stats[section_name]["start_time"],
+                "error": str(e)
+            })
+            console.print(f"  [red]✗[/red] Section [cyan]{section_name}[/cyan]: Error - {type(e).__name__}: {str(e)}")
 
-    # Print final results summary
-    final_table = Table(
-        title="[bold green]Extraction Results[/bold green]",
+    # Create section summary table
+    section_table = Table(
+        title="[bold]Section Extraction Summary[/bold]",
         show_header=True,
-        header_style="bold magenta",
-        expand=True
+        header_style="bold magenta"
     )
-    final_table.add_column("Section", style="cyan", no_wrap=True)
-    final_table.add_column("Fields Extracted", justify="right")
-    final_table.add_column("Status", justify="center")
-
-    for section_name, data in results.items():
-        fields_with_values = len([k for k, v in data.items() if v])
-        status = "[green]✓[/green]" if fields_with_values > 0 else "[yellow]⚠[/yellow]"
-        final_table.add_row(
+    section_table.add_column("Section", style="cyan")
+    section_table.add_column("Status", width=12)
+    section_table.add_column("Fields", justify="right")
+    section_table.add_column("Time", justify="right")
+    
+    total_fields = 0
+    for section_name, stats in section_stats.items():
+        status_str = {
+            "success": "[green]Success[/green]",
+            "no_data": "[yellow]No Data[/yellow]",
+            "error": "[red]Error[/red]",
+            "pending": "[dim]Pending[/dim]"
+        }.get(stats["status"], "[dim]Unknown[/dim]")
+        
+        section_table.add_row(
             section_name,
-            str(fields_with_values),
-            status
+            status_str,
+            str(stats["fields"]),
+            format_time_delta(stats["duration"]) if stats["duration"] else "-"
         )
-
-    # Print LLM response details
-    console.print("\n[bold]LLM Response Details:[/bold]")
-    for section_name, data in results.items():
-        if data:
-            console.print(f"\n[cyan]{section_name}:[/cyan]")
-            for field, value in data.items():
-                if value:
-                    console.print(f"  - {field}: [green]{value}[/green]")
+        
+        total_fields += stats["fields"]
+    
+    console.print(section_table)
     
     # Save results to JSON file if source file is provided
-    if source_file:
+    if source_file and total_fields > 0:
         try:
             # Create json_outputs directory if it doesn't exist
             os.makedirs("json_outputs", exist_ok=True)
@@ -698,24 +826,29 @@ def extract_all_sections(markdown_content, source_file=None):
             base_name = os.path.basename(source_file)
             json_filename = f"json_outputs/{base_name}.json"
             
-            # Verify and save results to JSON
-            if results and any(results.values()):
-                with open(json_filename, 'w', encoding='utf-8') as f:
-                    json.dump(results, f, indent=2, ensure_ascii=False)
-                console.print(f"\n[green]Saved results to {json_filename}[/green]")
-            else:
-                console.print(f"\n[yellow]No valid results to save for {json_filename}[/yellow]")
+            # Save results to JSON
+            with open(json_filename, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            console.print(f"[green]Saved results to {json_filename}[/green]")
                 
         except Exception as e:
             console.print(f"[red]Error saving JSON output: {str(e)}[/red]")
     
     return results
 
+@time_function
 def process_file(file_path):
     """Process a single file and return results"""
     try:
-        console.print(f"[dim]Preparing sheets for {os.path.basename(file_path)}...[/dim]")
+        file_name = os.path.basename(file_path)
+        sheet_stats = {}
+        
+        # Log start of sheet preparation without using timed_section (to avoid nesting)
+        console.print(f"[bold blue]Preparing sheets for {file_name}...[/bold blue]")
+        prep_start_time = time.time()
         all_sheet_markdowns = prepare_excel_sheets_markdown(file_path)
+        prep_duration = time.time() - prep_start_time
+        console.print(f"[green]✓[/green] Preparing sheets for {file_name} completed in {format_time_delta(prep_duration)}")
         
         if not all_sheet_markdowns:
             console.print(Panel(
@@ -729,16 +862,87 @@ def process_file(file_path):
         sheets_processed = 0
         fields_extracted = 0
         
-        for sheet_name, markdown_content in all_sheet_markdowns.items():
-            console.print(f"[dim]Extracting data from {sheet_name}...[/dim]")
-            sheet_results = extract_all_sections(markdown_content, file_path)
-            if sheet_results:
-                extraction_results[sheet_name] = sheet_results
-                sheets_processed += 1
-                fields_extracted += sum(
-                    len([v for v in section.values() if v is not None])
-                    for section in sheet_results.values()
-                )
+        # Process each sheet without using a nested Live display
+        console.print(f"[bold]Processing {len(all_sheet_markdowns)} sheets for {file_name}...[/bold]")
+        
+        for sheet_idx, (sheet_name, markdown_content) in enumerate(all_sheet_markdowns.items()):
+            # Show current sheet being processed
+            console.print(f"[dim]Sheet {sheet_idx+1}/{len(all_sheet_markdowns)}: [cyan]{sheet_name}[/cyan][/dim]")
+            
+            # Record start time for this sheet
+            sheet_start_time = time.time()
+            
+            try:
+                # Process sheet without status indicator
+                console.print(f"  [blue]Extracting data from {sheet_name}...[/blue]")
+                sheet_results = extract_all_sections(markdown_content, file_path)
+                
+                if sheet_results:
+                    extraction_results[sheet_name] = sheet_results
+                    sheets_processed += 1
+                    
+                    # Count extracted fields
+                    sheet_fields = sum(
+                        len([v for v in section.values() if v is not None])
+                        for section in sheet_results.values()
+                    )
+                    fields_extracted += sheet_fields
+                    
+                    # Record sheet statistics
+                    sheet_duration = time.time() - sheet_start_time
+                    sheet_stats[sheet_name] = {
+                        "duration": sheet_duration,
+                        "fields": sheet_fields,
+                        "status": "success"
+                    }
+                    
+                    # Show sheet success indicator
+                    console.print(f"  [green]✓[/green] Sheet [cyan]{sheet_name}[/cyan]: {sheet_fields} fields extracted in {format_time_delta(sheet_duration)}")
+                else:
+                    # Record sheet failure
+                    sheet_stats[sheet_name] = {
+                        "duration": time.time() - sheet_start_time,
+                        "fields": 0,
+                        "status": "no_data"
+                    }
+                    console.print(f"  [yellow]⚠[/yellow] Sheet [cyan]{sheet_name}[/cyan]: No data extracted")
+            
+            except Exception as e:
+                # Record sheet error
+                sheet_stats[sheet_name] = {
+                    "duration": time.time() - sheet_start_time,
+                    "fields": 0,
+                    "status": "error",
+                    "error": str(e)
+                }
+                console.print(f"  [red]✗[/red] Sheet [cyan]{sheet_name}[/cyan]: Error - {type(e).__name__}: {str(e)}")
+        
+        # Create sheet summary table
+        sheet_table = Table(
+            title=f"[bold]Sheet Processing Summary for {file_name}[/bold]",
+            show_header=True,
+            header_style="bold magenta"
+        )
+        sheet_table.add_column("Sheet", style="cyan")
+        sheet_table.add_column("Status", width=12)
+        sheet_table.add_column("Fields", justify="right")
+        sheet_table.add_column("Time", justify="right")
+        
+        for sheet_name, stats in sheet_stats.items():
+            status_str = {
+                "success": "[green]Success[/green]",
+                "no_data": "[yellow]No Data[/yellow]",
+                "error": "[red]Error[/red]"
+            }.get(stats["status"], "[dim]Unknown[/dim]")
+            
+            sheet_table.add_row(
+                sheet_name,
+                status_str,
+                str(stats["fields"]),
+                format_time_delta(stats["duration"])
+            )
+        
+        console.print(sheet_table)
         
         return extraction_results, sheets_processed, fields_extracted
         
@@ -750,10 +954,14 @@ def process_file(file_path):
         ))
         return None, 0, 0
 
+@time_function
 def process_directory(directory_path):
     """Process all Excel/CSV files in a directory sequentially"""
     # Create json_outputs directory if it doesn't exist
     os.makedirs("json_outputs", exist_ok=True)
+    
+    # Initialize processing statistics
+    stats = ProcessingStats()
     
     # Find all Excel/CSV files
     all_files = []
@@ -770,61 +978,92 @@ def process_directory(directory_path):
         return
 
     total_files = len(all_files)
-    success_count = 0
-    error_count = 0
-
-    # Process files sequentially
-    console.print(Panel("[bold]Starting Directory Processing[/bold]", border_style="blue"))
     
-    for file_path in all_files:
+    # Print process header
+    console.print(f"[bold]Processing {total_files} files...[/bold]")
+    
+    # Process files without using Progress widget
+    for i, file_path in enumerate(all_files):
         file_name = os.path.basename(file_path)
         
         # Show current file being processed
-        console.print(f"[cyan]Processing file: {file_name}[/cyan]")
+        console.print(f"[cyan]File {i+1}/{total_files}: {file_name}[/cyan]")
+        
+        # Record start time for this file
+        stats.record_file_start(file_path)
         
         try:
-            # Process file and get results
+            # Process file without using timed_section (to avoid nesting)
+            console.print(f"[bold blue]Processing {file_name}...[/bold blue]")
+            process_start_time = time.time()
             results, sheets_processed, fields_extracted = process_file(file_path)
+            process_duration = time.time() - process_start_time
+            console.print(f"[green]✓[/green] Processing {file_name} completed in {format_time_delta(process_duration)}")
             
             if results is not None:
+                # Record successful processing
+                stats.record_file_end(file_path, success=True, fields_extracted=fields_extracted)
+                
+                # Calculate time remaining
+                files_remaining = total_files - (i + 1)
+                time_remaining = stats.get_estimated_time_remaining(files_remaining)
+                
                 console.print(Panel(
                     f"[green]Successfully processed {file_name}[/green]\n"
                     f"• Sheets: [cyan]{sheets_processed}[/cyan]\n"
-                    f"• Fields: [cyan]{fields_extracted}[/cyan]",
+                    f"• Fields: [cyan]{fields_extracted}[/cyan]\n"
+                    f"• Processing time: [cyan]{format_time_delta(stats.file_times[file_path]['duration'])}[/cyan]",
+                    title=f"[bold green]File {i+1}/{total_files}[/bold green]",
+                    subtitle=f"[dim]Est. remaining: {format_time_delta(time_remaining)}[/dim]",
                     border_style="green"
                 ))
-                success_count += 1
             else:
+                # Record failed processing
+                stats.record_file_end(file_path, success=False)
                 console.print(Panel(
                     f"[yellow]No data extracted from {file_name}[/yellow]",
                     border_style="yellow"
                 ))
-                error_count += 1
-            
         except Exception as e:
+            # Record error
+            stats.record_file_end(file_path, success=False)
             console.print(Panel(
                 f"[red]Error processing {file_name}:[/red]\n"
                 f"[yellow]{type(e).__name__}: {str(e)}[/yellow]",
                 border_style="red"
             ))
-            error_count += 1
-
-    # Show final summary
+        
+        # Show progress percentage
+        percent_complete = ((i + 1) / total_files) * 100
+        console.print(f"[dim]Progress: {percent_complete:.1f}% ({i+1}/{total_files})[/dim]")
+        console.print("─" * 80)  # Separator line
+    
+    # Get summary statistics
+    summary = stats.get_summary()
+    
+    # Show detailed final summary
     console.print(Panel(
         f"[bold]Processing Summary:[/bold]\n"
         f"• Files processed: [cyan]{total_files}[/cyan]\n"
-        f"• Successful: [green]{success_count}[/green]\n"
-        f"• Errors: [red]{error_count}[/red]",
+        f"• Successful: [green]{summary['success_count']}[/green]\n"
+        f"• Errors: [red]{summary['error_count']}[/red]\n"
+        f"• Success rate: [cyan]{summary['success_rate']:.1f}%[/cyan]\n"
+        f"• Total fields extracted: [cyan]{summary['total_fields_extracted']}[/cyan]\n"
+        f"• Avg. fields per file: [cyan]{summary['avg_fields_per_file']:.1f}[/cyan]\n"
+        f"• Total processing time: [cyan]{format_time_delta(summary['total_duration'])}[/cyan]",
         title="[bold]Results[/bold]",
         border_style="blue"
     ))
 
 def main():
     """Main execution function with rich formatting"""
+    start_time = time.time()
+    
     try:
-        # Print fancy header
+        # Print fancy header with timestamp
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         console.print(Panel.fit(
-            "[bold green]Excel Header Mapper[/bold green]",
+            f"[bold green]Excel Header Mapper[/bold green]\n[dim]Started at: {current_time}[/dim]",
             subtitle="[dim]Process files or directories to extract structured data[/dim]",
             border_style="green",
             padding=(1, 2)
@@ -845,7 +1084,20 @@ def main():
         input_dir = "testing"
         
         if os.path.isdir(input_dir):
+            # Record start time
+            dir_start_time = time.time()
+            
+            # Process directory
             process_directory(input_dir)
+            
+            # Calculate total execution time
+            total_time = time.time() - dir_start_time
+            
+            # Print execution time summary
+            console.print(Panel(
+                f"[bold]Total Execution Time:[/bold] [cyan]{format_time_delta(total_time)}[/cyan]",
+                border_style="blue"
+            ))
         else:
             console.print(Panel(
                 f"[red]Directory not found: {input_dir}[/red]",
@@ -853,8 +1105,12 @@ def main():
             ))
         
     except Exception as e:
+        # Calculate execution time even if there was an error
+        error_time = time.time() - start_time
+        
         console.print(Panel(
-            f"[red]Error in main execution: {str(e)}[/red]",
+            f"[red]Error in main execution: {str(e)}[/red]\n"
+            f"[yellow]Execution time before error: {format_time_delta(error_time)}[/yellow]",
             title="[bold red]Error[/bold red]",
             border_style="red",
             padding=(1, 2)

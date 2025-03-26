@@ -1,13 +1,12 @@
-# Exclude Fluxs - AI Training folder
-Fluxs\ -\ AI\ Training/
+# Ignore the Fluxs - AI Training folder
+Fluxs - AI Training/
 testing/
-# Python
+# Python specific
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -19,31 +18,18 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# Virtual Environment
-venv/
-ENV/
+# Results and temporary files
+json_outputs/
+*.json
 
 # IDE files
 .idea/
 .vscode/
 *.swp
 *.swo
-
-# OS specific files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Output directories
-json_outputs/
