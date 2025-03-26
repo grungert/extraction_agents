@@ -20,7 +20,7 @@ class AppConfig(BaseModel):
     all_sheets: bool = False
     model: ModelConfig = ModelConfig()
 
-# Extraction models
+# Extraction models - base class
 class BaseExtraction(BaseModel):
     """Base model that all extraction models should inherit from."""
     pass
@@ -28,66 +28,66 @@ class BaseExtraction(BaseModel):
 # Context section
 class ContextModel(BaseExtraction):
     """Model for extracting context information."""
-    FileName: Optional[str] = Field(None, description="File name of the Excel document")
-    HeaderStartLine: Optional[int] = Field(None, description="Line where headers start (1-based)")
-    HeaderEndLine: Optional[int] = Field(None, description="Line where headers end (1-based)")
-    ContentStartLine: Optional[int] = Field(None, description="Line where content starts (1-based)")
-    FileType: Optional[str] = Field(None, description="File type (xlsx, csv)")
+    file_name: Optional[str] = Field(None, description="File name of the Excel document")
+    header_start_line: Optional[int] = Field(None, description="Line where headers start (1-based)")
+    header_end_line: Optional[int] = Field(None, description="Line where headers end (1-based)")
+    content_start_line: Optional[int] = Field(None, description="Line where content starts (1-based)")
+    file_type: Optional[str] = Field(None, description="File type (xlsx, csv)")
 
-# Identifier section
+# Identifier section - primary model for LLM extraction
 class IdentifierModel(BaseExtraction):
     """Model for extracting identifier information."""
-    Code: Optional[str] = Field(None, description="Header for ISIN Code. Examples: CODE ISIN, Code ISIN, ISIN")
-    CodeType: Optional[str] = Field(None, description="Type of code, typically 'Isin'")
-    Currency: Optional[str] = Field(None, description="Header for currency. Examples: Devise, Currency")
-    CIC_Code: Optional[str] = Field(None, description="Header for CIC Code if present")
+    code: Optional[str] = Field(None, description="Header for ISIN Code. Examples: CODE ISIN, Code ISIN, ISIN")
+    code_type: Optional[str] = Field(None, description="Type of code, typically 'Isin'")
+    currency: Optional[str] = Field(None, description="Header for currency. Examples: Devise, Currency")
+    cic_code: Optional[str] = Field(None, description="Header for CIC Code if present")
 
 # Denomination section
 class DenominationModel(BaseExtraction):
     """Model for extracting denomination information."""
-    VehiculeName: Optional[str] = Field(None, description="Header for vehicle name")
-    CompartmentName: Optional[str] = Field(None, description="Header for compartment name")
-    InstrumentName: Optional[str] = Field(None, description="Header for instrument name. Examples: FCP")
-    ShareType: Optional[str] = Field(None, description="Header for share type")
+    vehicule_name: Optional[str] = Field(None, description="Header for vehicle name")
+    compartment_name: Optional[str] = Field(None, description="Header for compartment name")
+    instrument_name: Optional[str] = Field(None, description="Header for instrument name. Examples: FCP")
+    share_type: Optional[str] = Field(None, description="Header for share type")
 
 # Valorisation section
 class ValorisationModel(BaseExtraction):
     """Model for extracting valorisation information."""
-    Nav: Optional[str] = Field(None, description="Header for NAV. Examples: Valeur Liquidative, VL")
-    NavDate: Optional[str] = Field(None, description="Header for NAV date. Example: Date de publication")
+    nav: Optional[str] = Field(None, description="Header for NAV. Examples: Valeur Liquidative, VL")
+    nav_date: Optional[str] = Field(None, description="Header for NAV date. Example: Date de publication")
 
 # MarketCap section
 class MarketCapModel(BaseExtraction):
     """Model for extracting market cap information."""
-    ReferenceDate: Optional[str] = Field(None, description="Header for reference date")
-    CompartmentCurrency: Optional[str] = Field(None, description="Header for compartment currency") 
-    CompartmentAssetValue: Optional[str] = Field(None, description="Header for asset value. Example: Actif Net")
-    ShareAssetValue: Optional[str] = Field(None, description="Header for share asset value")
-    Number_of_Shares: Optional[str] = Field(None, description="Header for number of shares. Example: Nombre de Parts")
+    reference_date: Optional[str] = Field(None, description="Header for reference date")
+    compartment_currency: Optional[str] = Field(None, description="Header for compartment currency") 
+    compartment_asset_value: Optional[str] = Field(None, description="Header for asset value. Example: Actif Net")
+    share_asset_value: Optional[str] = Field(None, description="Header for share asset value")
+    number_of_shares: Optional[str] = Field(None, description="Header for number of shares. Example: Nombre de Parts")
 
 # CorporateAction section
 class CorporateActionModel(BaseExtraction):
     """Model for extracting corporate action information."""
-    Currency: Optional[str] = Field(None, description="Header for currency")
-    Type: Optional[str] = Field(None, description="Header for type. Example: Coupon")
-    Value: Optional[str] = Field(None, description="Header for value. Example: COUPON")
-    ExecutionDate: Optional[str] = Field(None, description="Header for execution date. Example: DATE")
-    PaymentDate: Optional[str] = Field(None, description="Header for payment date")
-    RecordDate: Optional[str] = Field(None, description="Header for record date")
-    DistributionRate: Optional[str] = Field(None, description="Header for distribution rate")
+    currency: Optional[str] = Field(None, description="Header for currency")
+    type: Optional[str] = Field(None, description="Header for type. Example: Coupon")
+    value: Optional[str] = Field(None, description="Header for value. Example: COUPON")
+    execution_date: Optional[str] = Field(None, description="Header for execution date. Example: DATE")
+    payment_date: Optional[str] = Field(None, description="Header for payment date")
+    record_date: Optional[str] = Field(None, description="Header for record date")
+    distribution_rate: Optional[str] = Field(None, description="Header for distribution rate")
 
 # Characteristics section
 class CharacteristicsModel(BaseExtraction):
     """Model for extracting characteristics information."""
-    Strategy: Optional[str] = Field(None, description="Header for strategy")
-    AssetManager: Optional[str] = Field(None, description="Header for asset manager")
-    PortfolioManager: Optional[str] = Field(None, description="Header for portfolio manager")
-    HostingCountry: Optional[str] = Field(None, description="Header for hosting country")
-    LegalStatus: Optional[str] = Field(None, description="Header for legal status")
-    UnderLegalStatus: Optional[str] = Field(None, description="Header for under legal status")
-    InceptionDate: Optional[str] = Field(None, description="Header for inception date")
-    DistributionPolicy: Optional[str] = Field(None, description="Header for distribution policy")
-    PaymentFrequency: Optional[str] = Field(None, description="Header for payment frequency")
+    strategy: Optional[str] = Field(None, description="Header for strategy")
+    asset_manager: Optional[str] = Field(None, description="Header for asset manager")
+    portfolio_manager: Optional[str] = Field(None, description="Header for portfolio manager")
+    hosting_country: Optional[str] = Field(None, description="Header for hosting country")
+    legal_status: Optional[str] = Field(None, description="Header for legal status")
+    under_legal_status: Optional[str] = Field(None, description="Header for under legal status")
+    inception_date: Optional[str] = Field(None, description="Header for inception date")
+    distribution_policy: Optional[str] = Field(None, description="Header for distribution policy")
+    payment_frequency: Optional[str] = Field(None, description="Header for payment frequency")
 
 # Define which models to extract
 EXTRACTION_MODELS = {
@@ -95,17 +95,10 @@ EXTRACTION_MODELS = {
     "Identifier": IdentifierModel, 
 }
 
-# LLM extraction models
-class DataToExtract(BaseModel):
-    """Model for extracted data."""
-    code: Optional[str] = Field(..., description="ISIN Code from header. Example of values: SEDOL, ISIN code, FMSedols, BloombergTicker, Instrument Identifier/ISIN code, CODE ISIN, ISIN, AFCCodes, ISIN Code, CODE_WPK, Isin Code, WKN, USD.ISIN, VN, Bundesamt, ISIN CODE, Code ISIN, CodIsin, ISESedols, Sedol, EuroClearCedel, Column2, CODE_ISIN")
-    code_type: Optional[str] = Field(..., description="Isin from header")
-    currency: Optional[str] = Field(..., description="Share currency from header")
-    cic_code: Optional[str] = Field(..., description="CIC Code from header")
-
+# Container for LLM extraction results
 class Data(BaseModel):
     """Container for extracted data."""
-    dataExtracted: List[DataToExtract]
+    data_extracted: List[IdentifierModel]
 
 class Example(TypedDict):
     """

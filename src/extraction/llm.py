@@ -14,8 +14,8 @@ from ..utils.display import console
 from ..models import (
     AppConfig, 
     Data, 
-    DataToExtract, 
     Example, 
+    IdentifierModel,
     EXTRACTION_MODELS
 )
 
@@ -37,34 +37,35 @@ def configure_llm(config: AppConfig):
         max_retries=config.model.max_retries
     )
 
-def create_extraction_prompt():
+def create_extraction_prompt(section_name=None):
     """
-    Create the prompt template for extraction.
+    Create a prompt template for extraction with optional section focus.
     
+    Args:
+        section_name (str, optional): If provided, focuses extraction on this specific section
+        
     Returns:
         ChatPromptTemplate: Configured prompt template
     """
-    return ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """You are an expert data extraction algorithm. Your task is to map the column headers from an Excel table to the corresponding fields in a structured JSON output.  
+    # Customize based on whether we're extracting a specific section
+    section_text = f"the {section_name} section" if section_name else "a structured JSON output"
+    section_focus = f"that correspond to the {section_name} section" if section_name else "in the given input table"
+    
+    return ChatPromptTemplate.from_messages([
+        ("system", 
+         f"""You are an expert data extraction algorithm. Your task is to map the column headers from an Excel table to the corresponding fields in {section_text}.  
 
 ### Instructions:  
-- Identify the column headers in the given input table.  
-- Match each header to the corresponding attribute in the JSON output.  
-- Extract only relevant data under each header and assign it to the correct JSON field.  
-- If a required value is missing or unavailable, return `null` for that field.  
-- Ensure accuracy by strictly following the column-to-attribute mapping.  
-
-
-Your task is to process the input data and return structured JSON output that follows this mapping.  
+- Identify the column headers {section_focus}.
+- Match each header to the corresponding attribute in the JSON output.
+- Extract only relevant data under each header and assign it to the correct JSON field.
+- If a required value is missing or unavailable, return `null` for that field.
+- Ensure accuracy by strictly following the column-to-attribute mapping.
 """
-            ),
-            MessagesPlaceholder("examples"),
-            ("human", "{text}"),
-        ]
-    )
+        ),
+        MessagesPlaceholder("examples"),
+        ("human", "{text}"),
+    ])
 
 def tool_example_to_messages(example: Example) -> List[BaseMessage]:
     """
@@ -114,12 +115,12 @@ def initialize_llm_pipeline(config: AppConfig):
         config (AppConfig): Application configuration
         
     Returns:
-        tuple: (runnable, messages, llm) - The extraction pipeline, example messages, and configured LLM
+        tuple: (runnable, messages) - The extraction pipeline and example messages
     """
     # Configure LLM with the provided configuration
     llm = configure_llm(config)
     
-    # Create extraction prompt template
+    # Create general extraction prompt template (no section focus)
     prompt = create_extraction_prompt()
     
     # Define example data
@@ -132,8 +133,8 @@ FR0007436969	UFF AVENIR SECURITE	12/28/90	7,65	0,04	77,38	1,0988623769	NR	7,6504
 FR0010180786	UFF AVENIR FRANCE	12/15/91	1,13	0,56	90,24	1,0125183721	NR	1,12964721772921 €
 FR0007436969	UFF AVENIR SECURITE	12/23/91	4,73	0,01	78,86	1,0600243577	NR	4,73354198522159 €"""
 
-    # Create a proper example with the correct DataToExtract model
-    example_tool_call = DataToExtract(
+    # Create a proper example with the consolidated model
+    example_tool_call = IdentifierModel(
         code="CODE ISIN",
         code_type="Isin",
         currency="EUR",
@@ -144,7 +145,7 @@ FR0007436969	UFF AVENIR SECURITE	12/23/91	4,73	0,01	78,86	1,0600243577	NR	4,7335
     examples = [
         {
             "input": example_data,
-            "tool_calls": [Data(dataExtracted=[example_tool_call])]
+            "tool_calls": [Data(data_extracted=[example_tool_call])]
         }
     ]
 
@@ -177,25 +178,8 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
         BaseModel or None: Extracted data or None if extraction failed
     """
     try:
-        # Create a dynamic prompt for this specific section
-        section_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    f"""You are an expert data extraction algorithm. Your task is to map the column headers from an Excel table to the corresponding fields in the {section_name} section.  
-
-### Instructions:  
-- Identify the column headers in the given input table that correspond to the {section_name} section.
-- Match each header to the corresponding attribute in the JSON output.
-- Extract only relevant data under each header and assign it to the correct JSON field.
-- If a required value is missing or unavailable, return `null` for that field.
-- Ensure accuracy by strictly following the column-to-attribute mapping.
-                    """
-                ),
-                MessagesPlaceholder("examples"),
-                ("human", "{text}"),
-            ]
-        )
+        # Create a section-specific prompt
+        section_prompt = create_extraction_prompt(section_name)
         
         # Create a runnable specifically for this model
         section_runnable = section_prompt | llm.with_structured_output(
