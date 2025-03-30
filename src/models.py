@@ -98,8 +98,8 @@ class CharacteristicsModel(BaseExtraction):
 
 # Define which models to extract
 EXTRACTION_MODELS = {
-    "Context": ContextModel,
-    "Identifier": IdentifierModel, 
+    "DenominationModel": DenominationModel,
+    "Identifier": IdentifierModel
 }
 
 # Container for LLM extraction results

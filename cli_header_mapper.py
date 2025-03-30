@@ -9,7 +9,8 @@
 #   "langchain-core>=0.1.0",
 #   "langchain-openai>=0.1.0",
 #   "xlrd >= 2.0.1",
-#   "markitdown[all] >= 0.1.0"
+#   "markitdown[all] >= 0.1.0",
+#   "langfuse>=0.1.0"
 # ]
 # ///
 

@@ -33,3 +33,6 @@ json_outputs/
 *.swp
 *.swo
 .DS_Store
+
+# Environment variables
+.env

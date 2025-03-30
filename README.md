@@ -94,6 +94,43 @@ The system can be configured with the following options:
 - `temperature`: Temperature for LLM generation
 - `max_retries`: Maximum retries for LLM API calls
 
+## Monitoring with Langfuse
+
+This project supports monitoring LLM interactions using [Langfuse](https://langfuse.com). Langfuse provides observability for LLM applications, allowing you to track:
+
+- Performance metrics
+- Token usage
+- Response quality
+- Error rates
+
+### Setup
+
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Set up your Langfuse configuration in the `.env` file:
+   ```
+   LANGFUSE_ENABLED=true
+   LANGFUSE_PUBLIC_KEY=your_public_key_here
+   LANGFUSE_SECRET_KEY=your_secret_key_here
+   LANGFUSE_HOST=https://cloud.langfuse.com  # EU region
+   # LANGFUSE_HOST=https://us.cloud.langfuse.com  # US region
+   ```
+
+3. Install the required dependency:
+   ```bash
+   pip install python-dotenv langfuse
+   ```
+
+### Features
+
+- **Automatic Tracing**: Each extraction operation is automatically traced
+- **Error Tracking**: Failed extractions are logged with detailed error information
+- **Metadata**: Each trace includes metadata about the section being extracted
+- **Authentication Check**: The system verifies Langfuse connectivity at startup
+
 ## Development
 
 ### Adding New Extraction Models

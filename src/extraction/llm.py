@@ -1,6 +1,8 @@
 """LLM extraction utilities for Excel Header Mapper."""
+import os
 import uuid
 from typing import List, Any
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import (
@@ -27,15 +29,43 @@ def configure_llm(config: AppConfig):
         config (AppConfig): Application configuration
         
     Returns:
-        ChatOpenAI: Configured LLM instance
+        ChatOpenAI: Configured LLM instance with optional Langfuse monitoring
     """
-    return ChatOpenAI(
+    # Load environment variables from .env file
+    load_dotenv()
+    
+    # Initialize LLM
+    llm = ChatOpenAI(
         model_name=config.model.model_name,
         base_url=config.model.base_url,
         api_key=config.model.api_key,
         temperature=config.model.temperature,
         max_retries=config.model.max_retries
     )
+    
+    # Add Langfuse monitoring if enabled in .env
+    if os.getenv("LANGFUSE_ENABLED", "false").lower() == "true":
+        try:
+            from langfuse.callback import CallbackHandler
+            
+            # Create Langfuse callback handler (will use env vars automatically)
+            langfuse_handler = CallbackHandler()
+            
+            # Test connection (optional, can be removed in production)
+            try:
+                langfuse_handler.auth_check()
+                console.print("[green]✓[/green] Langfuse authentication successful")
+            except Exception as auth_error:
+                console.print(f"[yellow]⚠[/yellow] Langfuse authentication failed: {str(auth_error)}")
+            
+            # Add callback handler to LLM
+            llm.callbacks = [langfuse_handler]
+            
+            console.print("[green]✓[/green] Langfuse monitoring enabled")
+        except Exception as e:
+            console.print(f"[yellow]⚠[/yellow] Failed to initialize Langfuse: {str(e)}")
+    
+    return llm
 
 def create_extraction_prompt(section_name=None):
     """
@@ -177,6 +207,23 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
     Returns:
         BaseModel or None: Extracted data or None if extraction failed
     """
+    # Create a trace for this extraction if Langfuse is enabled
+    trace_id = None
+    if hasattr(llm, 'callbacks') and llm.callbacks:
+        for callback in llm.callbacks:
+            if hasattr(callback, 'create_trace'):
+                try:
+                    trace = callback.create_trace(
+                        name=f"extract_{section_name}",
+                        metadata={
+                            "section": section_name,
+                            "model_class": model_class.__name__
+                        }
+                    )
+                    trace_id = trace.id
+                except Exception as e:
+                    console.print(f"[yellow]⚠[/yellow] Failed to create Langfuse trace: {str(e)}")
+    
     try:
         # Create a section-specific prompt
         section_prompt = create_extraction_prompt(section_name)
@@ -198,10 +245,47 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
         
         # Validate the result structure
         if not hasattr(result, 'model_dump'):
+            # End trace with error if it exists
+            if trace_id:
+                for callback in llm.callbacks:
+                    if hasattr(callback, 'update_trace'):
+                        try:
+                            callback.update_trace(
+                                trace_id=trace_id,
+                                status="error",
+                                metadata={"error": "Invalid result structure"}
+                            )
+                        except Exception:
+                            pass
             return None
+        
+        # End trace with success if it exists
+        if trace_id:
+            for callback in llm.callbacks:
+                if hasattr(callback, 'update_trace'):
+                    try:
+                        callback.update_trace(
+                            trace_id=trace_id,
+                            status="success"
+                        )
+                    except Exception:
+                        pass
             
         return result
         
     except Exception as e:
+        # Log error to trace if it exists
+        if trace_id:
+            for callback in llm.callbacks:
+                if hasattr(callback, 'update_trace'):
+                    try:
+                        callback.update_trace(
+                            trace_id=trace_id,
+                            status="error",
+                            metadata={"error": str(e)}
+                        )
+                    except Exception:
+                        pass
+        
         console.print(f"[red]Error extracting {section_name}: {str(e)}[/red]")
         return None
