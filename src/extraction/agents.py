@@ -13,6 +13,155 @@ from ..models import (
 )
 from .llm import extract_section, configure_llm
 
+class HeaderValidationAgent:
+    """Agent for validating header detection results."""
+    
+    def __init__(self, llm):
+        """
+        Initialize the header validation agent.
+        
+        Args:
+            llm: LLM instance to use for validation
+        """
+        self.llm = llm
+        self.messages = self._create_validation_messages()
+        
+    def validate(self, header_info: ContextModel, markdown_content: str) -> Optional[ContextModel]:
+        """
+        Validate header detection results against the original table.
+        
+        Args:
+            header_info: Header detection information to validate
+            markdown_content: Original markdown table content
+            
+        Returns:
+            Validated header information with confidence score, or None if validation failed
+        """
+        console.print("[blue]Validating header detection...[/blue]")
+        
+        try:
+            # Convert header info to JSON string
+            header_json = json.dumps(header_info.model_dump())
+            
+            # Create a combined input with both the table and header info
+            # Format the input as a markdown string
+            combined_input = f"""
+# Original Table
+{markdown_content[:500]}
+
+# Detected Headers
+```json
+{header_json}
+```
+"""
+            
+            # Validate header detection
+            result = extract_section(
+                markdown_content=combined_input,
+                section_name="HeaderValidation",
+                model_class=ContextModel,
+                messages=self.messages,
+                llm=self.llm
+            )
+            
+            if result and hasattr(result, 'validation_confidence'):
+                console.print(f"[green]✓[/green] Header validation successful with confidence {result.validation_confidence:.2f}")
+                return result
+            else:
+                console.print(f"[yellow]⚠[/yellow] Header validation returned incomplete data")
+                return None
+                
+        except Exception as e:
+            console.print(f"[red]Error in header validation: {str(e)}[/red]")
+            return None
+    
+    def _create_validation_messages(self) -> List[Dict]:
+        """
+        Create example messages for header validation.
+        
+        Returns:
+            List of message dictionaries for the LLM
+        """
+        # Create system message
+        system_message = {
+            "role": "system",
+            "content": """You are an expert at validating header detection in Excel tables.
+Your task is to validate and correct the detected header positions by comparing them with the original table.
+
+Input Format:
+The input contains two sections:
+1. Original Table: The Excel table in markdown format
+2. Detected Headers: The header positions detected by the header detection agent
+
+Guidelines:
+1. Compare the detected header positions with the original table to verify accuracy
+2. Check if the header_start_line, header_end_line, and content_start_line make sense for the table
+3. Correct any issues found in the header positions
+4. Provide a confidence score (0.0-1.0) for your validation
+
+Return your validation as a JSON object with these fields:
+- header_start_line: Line where headers start (0-based index)
+- header_end_line: Line where headers end (0-based index)
+- content_start_line: Line where content starts (0-based index)
+- validation_confidence: Your confidence score (0.0-1.0)
+"""
+        }
+        
+        # Example 1: Simple table with clear headers
+        example1_input = """
+# Original Table
+| Column1 | Column2 | Column3 |
+|---------|---------|---------|
+| data1   | data2   | data3   |
+| data4   | data5   | data6   |
+
+# Detected Headers
+```json
+{"header_start_line": 0, "header_end_line": 0, "content_start_line": 2}
+```
+"""
+        
+        example1_output_dict = {
+            "header_start_line": 0,
+            "header_end_line": 0,
+            "content_start_line": 2,
+            "validation_confidence": 0.95
+        }
+        
+        # Example 2: Table with multi-row headers
+        example2_input = """
+# Original Table
+| Main Category | | |
+|--------------|--------------|--------------|
+| Subcategory1 | Subcategory2 | Subcategory3 |
+| data1        | data2        | data3        |
+| data4        | data5        | data6        |
+
+# Detected Headers
+```json
+{"header_start_line": 0, "header_end_line": 2, "content_start_line": 3}
+```
+"""
+        
+        example2_output_dict = {
+            "header_start_line": 0,
+            "header_end_line": 2,
+            "content_start_line": 3,
+            "validation_confidence": 0.9
+        }
+        
+        # Create examples
+        examples = [
+            {"role": "user", "content": example1_input},
+            {"role": "assistant", "content": json.dumps(example1_output_dict)},
+            {"role": "user", "content": example2_input},
+            {"role": "assistant", "content": json.dumps(example2_output_dict)}
+        ]
+        
+        # Combine system message and examples
+        return [system_message] + examples
+
+
 class HeaderDetectionAgent:
     """Agent for detecting header positions in Excel sheets."""
     
@@ -511,6 +660,7 @@ class AgentPipelineCoordinator:
         self.config = config
         self.llm = configure_llm(config)
         self.header_agent = HeaderDetectionAgent(self.llm)
+        self.header_validation_agent = HeaderValidationAgent(self.llm)
         self.extraction_agent = LLMExtractionAgent(self.llm)
         self.validation_agent = ValidationAgent(self.llm)
         
@@ -533,17 +683,23 @@ class AgentPipelineCoordinator:
         # Step 1: Detect headers
         header_info = self.header_agent.detect_headers(markdown_content)
         
-        # Check confidence and use fallback if needed
-        header_confidence = 0.0
-        if (header_info and 
-            hasattr(header_info, '_header_detection_confidence') and 
-            header_info._header_detection_confidence >= 0.8):
-            # Confidence already printed in HeaderDetectionAgent.detect_headers
-            header_confidence = header_info._header_detection_confidence
-        else:
-            # Fallback already prints its own message
-            header_info = self.header_agent.fallback_header_detection(markdown_content)
-            header_confidence = 0.5  # Default medium confidence for fallback
+        # Check if header detection failed
+        if not header_info:
+            console.print("[red]Header detection failed[/red]")
+            return {"error": "header detection failed"}
+        
+        # Step 2: Validate header detection
+        validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
+        
+        # Check if header validation failed or has low confidence
+        if not validated_header_info or (hasattr(validated_header_info, 'validation_confidence') and 
+                                         validated_header_info.validation_confidence < 0.7):
+            console.print("[red]Header validation failed or has low confidence[/red]")
+            return {"error": "header detection failed"}
+        
+        # Use validated header info
+        header_info = validated_header_info
+        header_confidence = validated_header_info.validation_confidence if hasattr(validated_header_info, 'validation_confidence') else 0.7
         
         # Extract file information from source_file
         file_name = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
