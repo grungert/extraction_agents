@@ -330,6 +330,11 @@ Guidelines:
 2. Match column headers to the corresponding fields in the {section_name} section
 3. Return only the headers, not the actual data values
 4. If a field is not present in the table, return null for that field
+5. Provide a confidence score (0.0-1.0) for your extraction
+
+Return your extraction as a JSON object with these fields:
+- All the fields from the {section_name} model
+- validation_confidence: Your confidence score (0.0-1.0)
 """
         }
         
@@ -376,13 +381,19 @@ class ValidationAgent:
             extracted_json = json.dumps(extracted_data.model_dump())
             
             # Create a combined input with both the table and extracted data
-            combined_input = {
-                "table": focused_content,
-                "extracted_data": extracted_json
-            }
+            # Format the input as a markdown string with the table and extracted data
+            combined_input = f"""
+# Original Table
+{focused_content}
+
+# Extracted Data
+```json
+{extracted_json}
+```
+"""
             
-            # Convert to JSON string
-            json_input = json.dumps(combined_input)
+            # Use the combined input directly as markdown
+            json_input = combined_input
             
             # Create validation model class that extends the original
             validation_model = self._create_validation_model(model_class)
@@ -464,8 +475,9 @@ class ValidationAgent:
 Your task is to validate and correct the extracted data by comparing it with the original table.
 
 Input Format:
-- table: The original Excel table in markdown format
-- extracted_data: The data extracted from the table in JSON format
+The input contains two sections:
+1. Original Table: The Excel table in markdown format
+2. Extracted Data: The data extracted from the table in JSON format
 
 Guidelines:
 1. Compare the extracted data with the original table to verify accuracy
