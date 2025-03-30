@@ -23,7 +23,13 @@ class AppConfig(BaseModel):
 # Extraction models - base class
 class BaseExtraction(BaseModel):
     """Base model that all extraction models should inherit from."""
-    pass
+    validation_confidence: Optional[float] = Field(None, description="Confidence in validation (0.0-1.0)")
+
+# Validation model base class
+class ValidationResult(BaseModel):
+    """Base model for validation results."""
+    validation_confidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
+    corrections_made: List[str] = Field([], description="List of corrections made during validation")
 
 # Context section
 class ContextModel(BaseExtraction):
@@ -33,6 +39,7 @@ class ContextModel(BaseExtraction):
     header_end_line: Optional[int] = Field(None, description="Line where headers end (1-based)")
     content_start_line: Optional[int] = Field(None, description="Line where content starts (1-based)")
     file_type: Optional[str] = Field(None, description="File type (xlsx, csv)")
+    # header_detection_confidence field removed as requested
 
 # Identifier section - primary model for LLM extraction
 class IdentifierModel(BaseExtraction):

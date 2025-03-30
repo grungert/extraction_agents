@@ -15,90 +15,74 @@ from .models import AppConfig, EXTRACTION_MODELS
 
 def extract_all_sections(markdown_content, source_file, config, llm_pipeline, messages):
     """
-    Extract all sections from markdown content.
+    Extract all sections from markdown content using the agent pipeline.
     
     Args:
         markdown_content (str): Markdown content to process
         source_file (str): Source file path (for output)
         config (AppConfig): Application configuration
-        llm_pipeline: LLM extraction pipeline
-        messages (List): Example messages for the LLM
+        llm_pipeline: LLM extraction pipeline (not used with agent pipeline)
+        messages (List): Example messages for the LLM (not used with agent pipeline)
         
     Returns:
         dict: Dictionary of extracted sections
     """
-    results = {}
+    from .extraction.agents import AgentPipelineCoordinator
+    
+    # Initialize section stats
     section_stats = {}
-
-    # Initialize all sections with complete field structure
     for section_name, model_class in EXTRACTION_MODELS.items():
-        # Create empty instance to get all fields
-        empty_instance = model_class()
-        results[section_name] = {k: None for k in empty_instance.model_fields.keys()}
-        
-        # Initialize section stats
         section_stats[section_name] = {
             "status": "pending",
             "fields": 0,
             "start_time": None,
             "duration": None
         }
-
-    # Process each section
-    console.print("[bold]Extracting data sections...[/bold]")
     
-    # Get a fresh LLM instance using the config
-    llm = configure_llm(config)
+    # Process each section using the agent pipeline
+    console.print("[bold]Extracting data using LLM agent pipeline...[/bold]")
     
-    for section_name, model_class in EXTRACTION_MODELS.items():
-        # Show current section being processed
-        console.print(f"[dim]Processing section: [cyan]{section_name}[/cyan][/dim]")
+    # Record start time for overall processing
+    overall_start_time = time.time()
+    
+    try:
+        # Initialize the agent pipeline
+        agent_pipeline = AgentPipelineCoordinator(config)
         
-        # Record start time
-        section_stats[section_name]["start_time"] = time.time()
+        # Process the markdown content
+        console.print("[blue]Running agent pipeline...[/blue]")
+        results = agent_pipeline.process_markdown(markdown_content, source_file)
         
-        try:
-            # Run extraction
-            console.print(f"  [blue]Extracting {section_name} data...[/blue]")
-            section_result = extract_section(markdown_content, section_name, model_class, messages, llm)
-            
-            if section_result:
-                result_data = section_result.model_dump()
-                # Update only fields that have values
-                for field, value in result_data.items():
-                    if value is not None:
-                        results[section_name][field] = value
-                
+        # Update section stats based on results
+        for section_name, section_data in results.items():
+            if section_name in section_stats:
                 # Count fields with values
-                fields_with_values = len([v for v in result_data.values() if v is not None])
+                fields_with_values = len([v for v in section_data.values() if v is not None])
                 
                 # Update section stats
                 section_stats[section_name].update({
-                    "status": "success",
+                    "status": "success" if fields_with_values > 0 else "no_data",
                     "fields": fields_with_values,
-                    "duration": time.time() - section_stats[section_name]["start_time"]
+                    "duration": time.time() - overall_start_time  # Approximate duration
                 })
-                
-                # Show success indicator
-                console.print(f"  [green]✓[/green] Section [cyan]{section_name}[/cyan]: {fields_with_values} fields extracted")
-            else:
-                # Update section stats for no data
-                section_stats[section_name].update({
-                    "status": "no_data",
-                    "fields": 0,
-                    "duration": time.time() - section_stats[section_name]["start_time"]
-                })
-                console.print(f"  [yellow]⚠[/yellow] Section [cyan]{section_name}[/cyan]: No data extracted")
-            
-        except Exception as e:
-            # Update section stats for error
+        
+        console.print(f"[green]✓[/green] Agent pipeline completed in {format_time_delta(time.time() - overall_start_time)}")
+        
+    except Exception as e:
+        console.print(f"[red]Error in agent pipeline: {type(e).__name__}: {str(e)}[/red]")
+        # Update all section stats to error
+        for section_name in section_stats:
             section_stats[section_name].update({
                 "status": "error",
                 "fields": 0,
-                "duration": time.time() - section_stats[section_name]["start_time"],
+                "duration": time.time() - overall_start_time,
                 "error": str(e)
             })
-            console.print(f"  [red]✗[/red] Section [cyan]{section_name}[/cyan]: Error - {type(e).__name__}: {str(e)}")
+        # Return empty results
+        results = {}
+        for section_name, model_class in EXTRACTION_MODELS.items():
+            empty_instance = model_class()
+            results[section_name] = {k: None for k in empty_instance.model_fields.keys()}
 
     # Create section summary table
     header_columns = [
@@ -128,7 +112,7 @@ def extract_all_sections(markdown_content, source_file, config, llm_pipeline, me
         
         total_fields += stats["fields"]
     
-    section_table = create_summary_table("Section Extraction Summary", header_columns, rows)
+    section_table = create_summary_table("Agent Pipeline Extraction Summary", header_columns, rows)
     console.print(section_table)
     
     # Save results to JSON file if source file is provided
