@@ -187,7 +187,6 @@ FR0007436969	UFF AVENIR SECURITE	12/23/91	4,73	0,01	78,86	1,0600243577	NR	4,7335
     # Create extraction pipeline
     runnable = prompt | llm.with_structured_output(
         schema=Data,
-        method="function_calling",
         include_raw=False,
     )
     
@@ -231,7 +230,6 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
         # Create a runnable specifically for this model
         section_runnable = section_prompt | llm.with_structured_output(
             schema=model_class,
-            method="function_calling",
             include_raw=False,
         )
         

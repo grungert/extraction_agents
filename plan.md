@@ -3,7 +3,7 @@
 ---
 
 ## 🎯 **Key Principle**
-All intelligent components in the pipeline — **extraction**, **header detection**, and **validation** — are implemented as **LLM Agents**. Each uses a well-structured prompt, and runs on a **local LLM (e.g., Gemma)** via your `GemmaLLMAgent`.
+All intelligent components in the pipeline — **extraction**, **header detection**, **header validation**, and **data validation** — are implemented as **LLM Agents**. Each uses a well-structured prompt, and runs on a **local LLM (e.g., Gemma)** via your `GemmaLLMAgent`.
 
 ---
 
@@ -14,18 +14,19 @@ flowchart TD
     Input[Excel/CSV Input] --> Convert[Convert to Markdown]
     Convert --> HeaderDetect[HeaderDetectionAgent]
     
-    HeaderDetect -->|Confidence ≥ 0.8| Extract[LLMExtractionAgent]
-    HeaderDetect -->|Confidence < 0.8| FallbackH[Header Fallback]
-    FallbackH --> Extract
+    HeaderDetect --> HeaderValidate[HeaderValidationAgent]
+    HeaderValidate -->|Confidence ≥ 0.7| Extract[LLMExtractionAgent]
+    HeaderValidate -->|Confidence < 0.7| Error[Error: Header Detection Failed]
     
     Extract --> Validate[ValidationAgent]
     
     Validate -->|Confidence ≥ 0.8| Output[JSON Output]
-    Validate -->|Confidence < 0.8| Refine[Refinement Loop]
-    Refine --> Extract
+    Validate -->|Confidence < 0.8| UseOriginal[Use Original Extraction]
+    UseOriginal --> Output
     
     subgraph "Integration with Existing Code"
         HeaderDetect -.-> Process[processing.py]
+        HeaderValidate -.-> Process
         Extract -.-> Process
         Validate -.-> Process
         Process -.-> Output
@@ -44,7 +45,7 @@ flowchart TD
   - `header_start_line`
   - `header_end_line`
   - `content_start_line`
-  - `header_detection_confidence` (0.0–1.0)
+  - `validation_confidence` (0.0–1.0)
 
 #### 🔗 Implementation Pattern:
 Uses this format internally:
@@ -65,7 +66,7 @@ Populates `ContextModel`:
   "header_start_line": 3,
   "header_end_line": 4,
   "content_start_line": 5,
-  "header_detection_confidence": 0.94
+  "validation_confidence": 0.94
 }
 ```
 
@@ -91,15 +92,83 @@ class HeaderDetectionAgent:
         # Return formatted messages for the LLM
 ```
 
-#### 🔄 Fallback Strategy:
-- If confidence < 0.8, use heuristic detection:
-  - Look for rows with different formatting
-  - Identify first row with numeric data
-  - Default to header_start_line=0, header_end_line=1, content_start_line=2
+---
+
+### 🧩 2. **HeaderValidationAgent (LLM Agent)**
+
+#### ✅ Purpose:
+- Validate the header detection results against the original table
+- Correct any issues in the header positions
+- Provide a confidence score for the validation
+
+#### 🔗 Implementation Pattern:
+```python
+def extract_section(markdown_content, section_name, model_class, messages, llm)
+```
+
+#### 🎯 Input:
+```
+# Original Table
+| Column1 | Column2 | Column3 |
+|---------|---------|---------|
+| data1   | data2   | data3   |
+| data4   | data5   | data6   |
+
+# Detected Headers
+```json
+{"header_start_line": 0, "header_end_line": 0, "content_start_line": 2}
+```
+```
+
+#### 🎯 Output:
+```json
+{
+  "header_start_line": 0,
+  "header_end_line": 0,
+  "content_start_line": 2,
+  "validation_confidence": 0.95
+}
+```
+
+#### 🔄 Class Implementation:
+```python
+class HeaderValidationAgent:
+    def __init__(self, llm):
+        self.llm = llm
+        self.messages = self._create_validation_messages()
+        
+    def validate(self, header_info, markdown_content):
+        """Validate header detection results against the original table."""
+        # Convert header info to JSON string
+        header_json = json.dumps(header_info.model_dump())
+        
+        # Create a combined input with both the table and header info
+        combined_input = f"""
+# Original Table
+{markdown_content[:500]}
+
+# Detected Headers
+```json
+{header_json}
+```
+"""
+        
+        return extract_section(
+            markdown_content=combined_input,
+            section_name="HeaderValidation",
+            model_class=ContextModel,
+            messages=self.messages,
+            llm=self.llm
+        )
+        
+    def _create_validation_messages(self):
+        # Create example messages for validation
+        # Return formatted messages for the LLM
+```
 
 ---
 
-### 🧩 2. **LLMExtractionAgent (Existing Agent)**
+### 🧩 3. **LLMExtractionAgent (Existing Agent)**
 
 #### ✅ Purpose:
 - Process structured markdown (headers + 10 rows of content)
@@ -146,20 +215,36 @@ class LLMExtractionAgent:
 
 ---
 
-### 🧩 3. **ValidationAgent (LLM Agent)**
+### 🧩 4. **ValidationAgent (LLM Agent)**
 
 #### ✅ Purpose:
-- Receives initial extracted data per section
+- Receives initial extracted data per section and the original table
 - Validates structure, corrects inconsistencies (via prompt)
 - Returns cleaned/confirmed data + **confidence score (0.0–1.0)**
 
 #### 🔗 Implementation Pattern:
 ```python
-def extract_section(json_input_as_text, section_name, model_class, messages, llm)
+def extract_section(markdown_content, section_name, model_class, messages, llm)
 ```
 
-- Uses JSON as markdown-like input for validation
-- Provides repaired and confidence-rated output per section
+#### 🎯 Input:
+```
+# Original Table
+| Column1 | Column2 | Column3 |
+|---------|---------|---------|
+| data1   | data2   | data3   |
+| data4   | data5   | data6   |
+
+# Extracted Data
+```json
+{
+  "code": "CODE ISIN",
+  "code_type": "Isin",
+  "currency": "Euro",
+  "cic_code": null
+}
+```
+```
 
 #### 🎯 Output:
 ```json
@@ -182,21 +267,39 @@ class ValidationAgent:
         self.llm = llm
         self.messages = self._create_validation_messages()
         
-    def validate(self, extracted_data, section_name, model_class):
-        """Validate extracted data for a specific section."""
+    def validate(self, extracted_data, markdown_content, header_info, section_name, model_class):
+        """Validate extracted data for a specific section against the original table."""
+        # Focus on relevant rows based on header detection
+        focused_content = self._focus_content(markdown_content, header_info)
+        
         # Convert extracted data to JSON string
-        json_input = json.dumps(extracted_data.model_dump())
+        extracted_json = json.dumps(extracted_data.model_dump())
+        
+        # Create a combined input with both the table and extracted data
+        combined_input = f"""
+# Original Table
+{focused_content}
+
+# Extracted Data
+```json
+{extracted_json}
+```
+"""
         
         # Create validation model class that extends the original
         validation_model = self._create_validation_model(model_class)
         
         return extract_section(
-            markdown_content=json_input,
+            markdown_content=combined_input,
             section_name=f"{section_name}Validation",
             model_class=validation_model,
             messages=self.messages,
             llm=self.llm
         )
+        
+    def _focus_content(self, markdown_content, header_info):
+        """Focus on relevant rows based on header detection."""
+        # Implementation to extract header + 10 rows of content
         
     def _create_validation_model(self, model_class):
         """Create a validation model that extends the original model."""
@@ -213,7 +316,7 @@ class ValidationAgent:
 
 ### ✅ Purpose:
 - Orchestrate the entire extraction pipeline
-- Handle agent interactions and fallbacks
+- Handle agent interactions and error handling
 - Integrate with existing processing.py workflow
 
 ### 🔄 Implementation:
@@ -223,24 +326,62 @@ class AgentPipelineCoordinator:
         self.config = config
         self.llm = configure_llm(config)
         self.header_agent = HeaderDetectionAgent(self.llm)
+        self.header_validation_agent = HeaderValidationAgent(self.llm)
         self.extraction_agent = LLMExtractionAgent(self.llm)
         self.validation_agent = ValidationAgent(self.llm)
         
     def process_markdown(self, markdown_content, source_file):
         """Process markdown content through the agent pipeline."""
-        results = {}
+        # Initialize an ordered dictionary to maintain the order of sections
+        ordered_results = OrderedDict()
         
         # Step 1: Detect headers
         header_info = self.header_agent.detect_headers(markdown_content)
         
-        # Check confidence and use fallback if needed
-        if header_info and header_info.header_detection_confidence >= 0.8:
-            console.print(f"[green]✓[/green] Header detection successful with confidence {header_info.header_detection_confidence:.2f}")
-        else:
-            console.print("[yellow]⚠[/yellow] Low confidence in header detection, using fallback strategy")
-            header_info = self._header_fallback(markdown_content)
+        # Check if header detection failed
+        if not header_info:
+            console.print("[red]Header detection failed[/red]")
+            return {"error": "header detection failed"}
         
-        # Step 2: Extract each section
+        # Step 2: Validate header detection
+        validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
+        
+        # Check if header validation failed or has low confidence
+        if not validated_header_info or (hasattr(validated_header_info, 'validation_confidence') and 
+                                         validated_header_info.validation_confidence < 0.7):
+            console.print("[red]Header validation failed or has low confidence[/red]")
+            return {"error": "header detection failed"}
+        
+        # Use validated header info
+        header_info = validated_header_info
+        header_confidence = validated_header_info.validation_confidence if hasattr(validated_header_info, 'validation_confidence') else 0.7
+        
+        # Extract file information from source_file
+        file_name = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
+        file_ext = os.path.splitext(source_file)[1].lower() if source_file else None
+        file_type = file_ext.lstrip('.') if file_ext else None
+        
+        # Always create a Context section with header detection information
+        context_data = {
+            "validation_confidence": header_confidence,
+            "file_name": file_name,
+            "header_start_line": None,
+            "header_end_line": None,
+            "content_start_line": None,
+            "file_type": file_type
+        }
+        
+        # Copy header detection information to Context section
+        if header_info:
+            for field in ["header_start_line", "header_end_line", "content_start_line"]:
+                if hasattr(header_info, field) and getattr(header_info, field) is not None:
+                    context_data[field] = getattr(header_info, field)
+        
+        # Add Context section to ordered results first
+        ordered_results["Context"] = context_data
+        
+        # Step 3: Extract each section
+        results = {}  # Temporary dictionary for extraction results
         for section_name, model_class in EXTRACTION_MODELS.items():
             # Initialize section results
             results[section_name] = {k: None for k in model_class().model_fields.keys()}
@@ -257,22 +398,37 @@ class AgentPipelineCoordinator:
                 console.print(f"[yellow]⚠[/yellow] No data extracted for {section_name}")
                 continue
                 
-            # Step 3: Validate data
+            # Step 4: Validate data
             validated_result = self.validation_agent.validate(
                 extracted_data,
+                markdown_content,
+                header_info,
                 section_name,
                 model_class
             )
             
             # Check validation confidence
-            if validated_result and validated_result.validation_confidence >= 0.8:
+            if (validated_result and 
+                hasattr(validated_result, 'validation_confidence') and 
+                validated_result.validation_confidence >= 0.8 and
+                hasattr(validated_result, 'validated_data')):
+                
                 # Update results with validated data
                 validated_data = validated_result.validated_data.model_dump()
                 for field, value in validated_data.items():
                     if value is not None:
                         results[section_name][field] = value
+                
+                # Add validation confidence to results
+                results[section_name]['validation_confidence'] = validated_result.validation_confidence
                         
                 console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.validation_confidence:.2f}")
+                
+                # Log corrections if any
+                if hasattr(validated_result, 'corrections_made') and validated_result.corrections_made:
+                    console.print(f"[blue]Corrections made:[/blue]")
+                    for correction in validated_result.corrections_made:
+                        console.print(f"  • {correction}")
             else:
                 # Use original extraction if validation fails
                 console.print(f"[yellow]⚠[/yellow] Low validation confidence for {section_name}, using original extraction")
@@ -280,12 +436,18 @@ class AgentPipelineCoordinator:
                 for field, value in result_data.items():
                     if value is not None:
                         results[section_name][field] = value
+                
+                # Add a lower validation confidence
+                if validated_result and hasattr(validated_result, 'validation_confidence'):
+                    results[section_name]['validation_confidence'] = validated_result.validation_confidence
+                else:
+                    results[section_name]['validation_confidence'] = 0.5  # Default medium confidence
         
-        return results
+        # Add extraction results to ordered results
+        for section_name, section_data in results.items():
+            ordered_results[section_name] = section_data
         
-    def _header_fallback(self, markdown_content):
-        """Fallback strategy for header detection."""
-        # Implementation of heuristic-based header detection
+        return ordered_results
 ```
 
 ---
@@ -307,6 +469,11 @@ def extract_all_sections(markdown_content, source_file, config, llm_pipeline, me
     # Process the markdown content
     results = agent_pipeline.process_markdown(markdown_content, source_file)
     
+    # Check if header detection failed
+    if "error" in results:
+        console.print(f"[red]Error: {results['error']}[/red]")
+        return results
+    
     # Rest of the function remains the same (statistics, JSON output, etc.)
     # ...
     
@@ -324,7 +491,7 @@ class ValidationResult(BaseModel):
     validation_confidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
     corrections_made: List[str] = Field([], description="List of corrections made during validation")
 
-# Add header detection confidence to ContextModel
+# Update ContextModel
 class ContextModel(BaseExtraction):
     """Model for extracting context information."""
     file_name: Optional[str] = Field(None, description="File name of the Excel document")
@@ -332,7 +499,7 @@ class ContextModel(BaseExtraction):
     header_end_line: Optional[int] = Field(None, description="Line where headers end (1-based)")
     content_start_line: Optional[int] = Field(None, description="Line where content starts (1-based)")
     file_type: Optional[str] = Field(None, description="File type (xlsx, csv)")
-    header_detection_confidence: Optional[float] = Field(None, description="Confidence in header detection (0.0-1.0)")
+    # validation_confidence is inherited from BaseExtraction
 ```
 
 ---
@@ -341,6 +508,7 @@ class ContextModel(BaseExtraction):
 
 ### 1. **Metrics**:
 - Header detection accuracy (compared to manual labeling)
+- Header validation effectiveness (% of errors caught and fixed)
 - Extraction field accuracy (% of correctly extracted fields)
 - Validation effectiveness (% of errors caught and fixed)
 - End-to-end processing time
@@ -357,6 +525,7 @@ def evaluate_pipeline(test_files, ground_truth, config):
     """Evaluate the agent pipeline against ground truth data."""
     metrics = {
         "header_detection": {"correct": 0, "total": 0},
+        "header_validation": {"fixed": 0, "missed": 0},
         "extraction": {"correct": 0, "total": 0},
         "validation": {"fixed": 0, "missed": 0},
         "processing_time": []
@@ -374,13 +543,13 @@ def evaluate_pipeline(test_files, ground_truth, config):
 
 1. **Phase 1: Core Agent Implementation**
    - Implement HeaderDetectionAgent
+   - Implement HeaderValidationAgent
    - Integrate with existing extraction logic
-   - Add basic fallback strategies
 
 2. **Phase 2: Validation & Refinement**
-   - Implement ValidationAgent
+   - Enhance ValidationAgent to use original table
    - Add confidence scoring
-   - Create refinement loops
+   - Implement error handling
 
 3. **Phase 3: Pipeline Coordination**
    - Implement AgentPipelineCoordinator

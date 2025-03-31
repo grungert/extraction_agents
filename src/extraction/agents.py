@@ -12,6 +12,9 @@ from ..models import (
     EXTRACTION_MODELS
 )
 from .llm import extract_section, configure_llm
+from ..examples.header_examples import _get_header_examples
+from ..examples.extraction_examples import get_extraction_examples, format_extraction_messages
+
 
 class HeaderValidationAgent:
     """Agent for validating header detection results."""
@@ -96,68 +99,40 @@ The input contains two sections:
 Guidelines:
 1. Compare the detected header positions with the original table to verify accuracy
 2. Check if the header_start_line, header_end_line, and content_start_line make sense for the table
-3. Correct any issues found in the header positions
-4. Provide a confidence score (0.0-1.0) for your validation
+3. Use examples as guides for common header patterns
+4. Correct any issues found in the header positions
+5. Provide a confidence score (0.0-1.0) for your validation
+6. Use examples to guide your validation process
 
 Return your validation as a JSON object with these fields:
-- header_start_line: Line where headers start (0-based index)
-- header_end_line: Line where headers end (0-based index)
-- content_start_line: Line where content starts (0-based index)
+- header_start_line: Line where headers start 
+- header_end_line: Line where headers end 
+- content_start_line: Line where content starts 
 - validation_confidence: Your confidence score (0.0-1.0)
 """
         }
         
-        # Example 1: Simple table with clear headers
-        example1_input = """
-# Original Table
-| Column1 | Column2 | Column3 |
-|---------|---------|---------|
-| data1   | data2   | data3   |
-| data4   | data5   | data6   |
+        # Get shared examples
+        header_examples = _get_header_examples()
+        
+        # Create examples for the LLM - format them for validation
+        examples = []
+        for idx, example in enumerate(header_examples[:2], start=1):  # Add index with enumerate
+            validation_input = f"""
+# Example {idx}
+# Input Table 
+{example["table"]}
 
-# Detected Headers
+# Output JSON
 ```json
-{"header_start_line": 0, "header_end_line": 0, "content_start_line": 2}
-```
-"""
-        
-        example1_output_dict = {
-            "header_start_line": 0,
-            "header_end_line": 0,
-            "content_start_line": 2,
-            "validation_confidence": 0.95
-        }
-        
-        # Example 2: Table with multi-row headers
-        example2_input = """
-# Original Table
-| Main Category | | |
-|--------------|--------------|--------------|
-| Subcategory1 | Subcategory2 | Subcategory3 |
-| data1        | data2        | data3        |
-| data4        | data5        | data6        |
+{json.dumps(example["json"], indent=2)}
+```"""
 
-# Detected Headers
-```json
-{"header_start_line": 0, "header_end_line": 2, "content_start_line": 3}
-```
-"""
-        
-        example2_output_dict = {
-            "header_start_line": 0,
-            "header_end_line": 2,
-            "content_start_line": 3,
-            "validation_confidence": 0.9
-        }
-        
-        # Create examples
-        examples = [
-            {"role": "user", "content": example1_input},
-            {"role": "assistant", "content": json.dumps(example1_output_dict)},
-            {"role": "user", "content": example2_input},
-            {"role": "assistant", "content": json.dumps(example2_output_dict)}
-        ]
-        
+            examples.extend([
+                {"role": "user", "content": validation_input},
+                {"role": "assistant", "content": json.dumps(example["json"])}
+            ])
+    
         # Combine system message and examples
         return [system_message] + examples
 
@@ -229,70 +204,6 @@ class HeaderDetectionAgent:
         Returns:
             List of message dictionaries for the LLM
         """
-        # Example 1: Simple table with clear headers
-        example1_input = """| Column1 | Column2 | Column3 |
-|---------|---------|---------|
-| data1   | data2   | data3   |
-| data4   | data5   | data6   |"""
-        
-        # Create example output with validation_confidence
-        example1_output_dict = {
-            "header_start_line": 0,
-            "header_end_line": 1,
-            "content_start_line": 1,
-            "validation_confidence": 0.95
-        }
-        
-        # Create ContextModel without header_detection_confidence
-        example1_output = ContextModel(
-            header_start_line=0,
-            header_end_line=0,
-            content_start_line=2
-        )
-        
-        # Example 2: Table with multi-row headers
-        example2_input = """| Main Category | | |
-|--------------|--------------|--------------|
-| Subcategory1 | Subcategory2 | Subcategory3 |
-| data1        | data2        | data3        |
-| data4        | data5        | data6        |"""
-        
-        # Create example output with validation_confidence
-        example2_output_dict = {
-            "header_start_line": 0,
-            "header_end_line": 2,
-            "content_start_line": 2,
-            "validation_confidence": 0.9
-        }
-        
-        # Create ContextModel without header_detection_confidence
-        example2_output = ContextModel(
-            header_start_line=0,
-            header_end_line=2,
-            content_start_line=3
-        )
-        
-        # Example 3: Table with no clear headers
-        example3_input = """| data1 | data2 | data3 |
-|-------|-------|-------|
-| data4 | data5 | data6 |
-| data7 | data8 | data9 |"""
-        
-        # Create example output with validation_confidence
-        example3_output_dict = {
-            "header_start_line": 0,
-            "header_end_line": 1,
-            "content_start_line": 1,
-            "validation_confidence": 0.7
-        }
-        
-        # Create ContextModel without header_detection_confidence
-        example3_output = ContextModel(
-            header_start_line=0,
-            header_end_line=0,
-            content_start_line=1
-        )
-        
         # Create system message
         system_message = {
             "role": "system",
@@ -301,30 +212,42 @@ Your task is to identify the header rows and content rows in the table.
 
 Guidelines:
 1. Analyze the first 15 rows of the table to identify patterns
-2. Determine where the header starts and ends
-3. Determine where the actual content starts
-4. Provide a confidence score (0.0-1.0) for your detection
-5. Headers often have different formatting or contain column titles
-6. Content rows typically contain actual data values
+2. Use examples as guides for common header patterns
+3. Determine where the header starts and ends
+4. Determine where the actual content starts
+5. Provide a confidence score (0.0-1.0) for your detection
+6. Headers often have different formatting or contain column titles
+7. Content rows typically contain actual data values
+8. Use examples to guide your detection process
 
 Return your analysis as a JSON object with these fields:
-- header_start_line: Line where headers start (0-based index)
-- header_end_line: Line where headers end (0-based index)
-- content_start_line: Line where content starts (0-based index)
+- header_start_line: Line where headers start
+- header_end_line: Line where headers end 
+- content_start_line: Line where content starts 
 - validation_confidence: Your confidence score (0.0-1.0)
 """
         }
         
-        # Create examples - use the dictionaries with header_detection_confidence for the examples
-        examples = [
-            {"role": "user", "content": example1_input},
-            {"role": "assistant", "content": json.dumps(example1_output_dict)},
-            {"role": "user", "content": example2_input},
-            {"role": "assistant", "content": json.dumps(example2_output_dict)},
-            {"role": "user", "content": example3_input},
-            {"role": "assistant", "content": json.dumps(example3_output_dict)}
-        ]
+        # Get shared examples
+        header_examples = _get_header_examples()
         
+        # Create examples for the LLM - format them for validation
+        examples = []
+        for idx, example in enumerate(header_examples[:2], start=1):  # Add index with enumerate
+            validation_input = f"""
+# Example {idx}
+# Input Table              
+{example["table"]}
+
+# Output JSON
+```json
+{json.dumps(example["json"], indent=2)}
+```"""
+
+            examples.extend([
+                {"role": "user", "content": validation_input},
+                {"role": "assistant", "content": json.dumps(example["json"])}
+            ])
         # Combine system message and examples
         return [system_message] + examples
 
@@ -480,6 +403,7 @@ Guidelines:
 3. Return only the headers, not the actual data values
 4. If a field is not present in the table, return null for that field
 5. Provide a confidence score (0.0-1.0) for your extraction
+6. Use examples to guide your extraction process
 
 Return your extraction as a JSON object with these fields:
 - All the fields from the {section_name} model
@@ -487,9 +411,15 @@ Return your extraction as a JSON object with these fields:
 """
         }
         
-        # For now, return just the system message
-        # In a real implementation, you would add examples specific to each section
-        return [system_message]
+        # Get examples for this section - use the model class if available
+        if section_name in EXTRACTION_MODELS:
+            model_class = EXTRACTION_MODELS[section_name]
+            examples = get_extraction_examples(model_class)
+        else:
+            examples = get_extraction_examples(section_name)
+        
+        # Format examples for extraction
+        return format_extraction_messages(examples, system_message)
 
 
 class ValidationAgent:
@@ -634,6 +564,7 @@ Guidelines:
 3. Correct any issues found (e.g., wrong mappings, formatting, capitalization, etc.)
 4. Provide a confidence score (0.0-1.0) for your validation
 5. List any corrections you made
+6. Use examples to guide your validation process
 
 Return your validation as a JSON object with these fields:
 - validated_data: The corrected data
@@ -642,9 +573,17 @@ Return your validation as a JSON object with these fields:
 """
         }
         
-        # For now, return just the system message
-        # In a real implementation, you would add examples
-        return [system_message]
+        # Get examples for validation
+        from ..examples.extraction_examples import get_extraction_examples, format_validation_messages
+        
+        # Get examples for all model classes in EXTRACTION_MODELS
+        all_examples = []
+        for model_name, model_class in EXTRACTION_MODELS.items():
+            examples = get_extraction_examples(model_class)
+            all_examples.extend(examples)
+        
+        # Format examples for validation
+        return format_validation_messages(all_examples, system_message)
 
 
 class AgentPipelineCoordinator:
