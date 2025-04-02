@@ -7,6 +7,18 @@ All intelligent components in the pipeline — **extraction**, **header detectio
 
 ---
 
+## Issues and steps:
+
+1.  When trying to read Excel files, if there is a cell with formatting (for example: 1.2 $), I couldn't manage to read the currency sign. This affects the extraction side.
+
+2.  Create a dynamic app to import new settings for agents.
+
+3.  Modify the JSON to have a structure based on the Excel sheet (open to the possibility that data can be in multiple sheets).
+
+4.  Modify the JSON to include a confidence level and processing time.
+
+5.  Work on the agents' prompts.
+
 ## 🔄 Pipeline Architecture
 
 ```mermaid

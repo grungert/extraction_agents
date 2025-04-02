@@ -99,7 +99,11 @@ class CharacteristicsModel(BaseExtraction):
 # Define which models to extract
 EXTRACTION_MODELS = {
     "DenominationModel": DenominationModel,
-    "Identifier": IdentifierModel
+    "Identifier": IdentifierModel,
+    "Valorisation": ValorisationModel,
+    "MarketCap": MarketCapModel,
+    "CorporateAction": CorporateActionModel,
+    "Characteristics": CharacteristicsModel
 }
 
 # Container for LLM extraction results

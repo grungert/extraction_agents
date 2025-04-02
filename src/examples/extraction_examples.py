@@ -35,15 +35,35 @@ def get_identifier_examples() -> List[Dict[str, Any]]:
     """
     raw_examples = [
         # Example 1
-        ("""| CODE ISIN | FCP | DATE | COUPON | CREDIT D'IMPÔT | VL APRES DETACH. |
-| --- | --- | --- | --- | --- | --- |
-| FR0007436969 | UFF AVENIR SECURITE | 1989-12-27 | 5.526277 | 0.030490 | 75.418053 |""",
+        ("""| Fund name                                  | ISIN code    | Currency   |     NAV |   Number of shares |   Total net assets value | Date                |
+|:-------------------------------------------|:-------------|:-----------|--------:|-------------------:|-------------------------:|:--------------------|
+| Jyske Invest Balanced Strategy (GBP) CL    | DK0060238194 | GBP        | 173.55  |              62414 |              1.08319e+07 | 2025-01-30 00:00:00 |
+| Jyske Invest Balanced Strategy USD         | DK0060656197 | USD        | 145.69  |              47670 |              6.94503e+06 | 2025-01-30 00:00:00 |
+| Jyske Invest Stable Strategy USD           | DK0060729259 | USD        | 130.212 |              42006 |              5.46968e+06 | 2025-01-30 00:00:00 |
+| Jyske Invest Stable Strategy GBP           | DK0060729333 | GBP        | 120.234 |              35561 |              4.27565e+06 | 2025-01-30 00:00:00 |
+| Jyske Invest High Yield Corporate Bonds CL | DK0016262728 | EUR        | 242.3   |             223484 |              5.41502e+07 | 2025-01-30 00:00:00 |""",
         {
-            "code": "CODE ISIN",
-            "code_type": "Isin",
-            "currency": "EUR",
-            "cic_code": None,
-            "validation_confidence": 0.95
+            "Code": "CODE ISIN",
+            "CodeType": "Isin",
+            "Currency": "[EUR]",
+            "CIC Code": "",
+            "validation_confidence": 0.99
+        }),
+         ("""| ODDO BHF Euro High Yield Bond CI   | LU0115288721   | 940818   |   nan |   nan | EUR   | 36.804              | 36.775              | 0.0008    | 36.783              | 0.0006      | 159247523.58   | 4326929.04         |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
+|:-----------------------------------|:---------------|:---------|------:|------:|:------|:--------------------|:--------------------|:----------|:--------------------|:------------|:---------------|:-------------------|------:|------:|:----|------:|------:|:---------------|
+| Fund Name                          | ISIN Code      | WKN      |   nan |   nan | Curr  | NAV per share       | Prior day           | prior day | Prior Month         | prior month | Total NAV      | Shares Outstanding |   nan |   nan | TIS |   nan |   nan | in base        |
+| nan                                | nan            | nan      |   nan |   nan | nan   | 2025-01-28 00:00:00 | 2025-01-27 00:00:00 | nan       | 2024-12-31 00:00:00 | nan         | nan            | nan                |   nan |   nan | nan |   nan |   nan | currency       |
+| ODDO BHF Euro High Yield Bond CN   | LU1486847152   | A2DNK1   |   nan |   nan | EUR   | 120.946             | 120.852             | 0.0008    | 120.909             | 0.0003      | 17823362.14    | 147366.15          |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
+| ODDO BHF Euro High Yield Bond CP   | LU0456627131   | A0YDE9   |   nan |   nan | EUR   | 16.136              | 16.123              | 0.0008    | 16.124              | 0.0007      | 312407251.09   | 19360880.03        |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
+| ODDO BHF Euro High Yield Bond CR   | LU0115290974   | 940820   |   nan |   nan | EUR   | 30.984              | 30.96               | 0.0008    | 30.984              | 0           | 99843747.81    | 3222413.8          |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
+| ODDO BHF Euro High Yield Bond DI   | LU0115293481   | 940819   |   nan |   nan | EUR   | 10.747              | 10.739              | 0.0007    | 10.741              | 0.0006      | 20300764.45    | 1888965.06         |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
+| ODDO BHF Euro High Yield Bond DP   | LU0456627214   | A0YDEA   |   nan |   nan | EUR   | 11.002              | 10.993              | 0.0008    | 10.993              | 0.0008      | 203711130.84   | 18516373.29        |   nan |   nan | 0   |   nan |   nan | 835941068.04   |""",
+        {
+            "Code": "ISIN Code",
+            "CodeType": "Isin",
+            "Currency": "Curr",
+            "CIC Code": "",
+            "validation_confidence": 0.91
         })
     ]
     
