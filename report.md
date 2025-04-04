@@ -52,10 +52,10 @@ flowchart TD
 
 -   Analyzes the **first 15 rows** of a sheet (provided in markdown format).
 -   Determines the following:
-    -   `header_start_line`
-    -   `header_end_line`
-    -   `content_start_line`
-    -   `validation_confidence` (0.0–1.0)
+    -   `HeaderStartLine`
+    -   `HeaderEndLine`
+    -   `ContentStartLine`
+    -   `ValidationConfidence` (0.0–1.0)
 
 #### 🔗 Implementation Pattern:
 
@@ -77,10 +77,10 @@ Populates a `ContextModel` instance with the following structure:
 
 ```json
 {
-  "header_start_line": 3,
-  "header_end_line": 4,
-  "content_start_line": 5,
-  "validation_confidence": 0.94
+  "HeaderStartLine": 3,
+  "HeaderEndLine": 4,
+  "ContentStartLine": 5,
+  "ValidationConfidence": 0.94
 }
 ```
 
@@ -137,17 +137,17 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
 
 # Detected Headers
 ```json
-{"header_start_line": 0, "header_end_line": 0, "content_start_line": 2}
+{"HeaderStartLine": 0, "HeaderEndLine": 0, "ContentStartLine": 2}
 ```
 
 #### 🎯 Output:
 
 ```json
 {
-  "header_start_line": 0,
-  "header_end_line": 0,
-  "content_start_line": 2,
-  "validation_confidence": 0.95
+  "HeaderStartLine": 0,
+  "HeaderEndLine": 0,
+  "ContentStartLine": 2,
+  "ValidationConfidence": 0.95
 }
 ```
 
@@ -292,7 +292,7 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
     "currency": "EUR",
     "cic_code": null
   },
-  "validation_confidence": 0.92,
+  "ValidationConfidence": 0.92,
   "corrections_made": ["Fixed currency format from 'Euro' to 'EUR'"]
 }
 ```
@@ -346,9 +346,9 @@ class ValidationAgent:
 
     def _create_validation_model(self, model_class):
         """Create a validation model that extends the original model."""
-        # Dynamically create a model with validation_confidence and corrections_made
+        # Dynamically create a model with ValidationConfidence and corrections_made
         class ValidatedModel(model_class):
-            validation_confidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
+            ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
             corrections_made: List[str] = Field([], description="List of corrections made during validation")
         return ValidatedModel
 
@@ -413,18 +413,18 @@ from pydantic import BaseModel, Field
 # Add validation model base class
 class ValidationResult(BaseModel):
     """Base model for validation results."""
-    validation_confidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
+    ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
     corrections_made: List[str] = Field([], description="List of corrections made during validation")
 
 # Update ContextModel
 class ContextModel(BaseModel): # Changed inheritance from BaseExtraction to BaseModel
     """Model for extracting context information."""
-    file_name: Optional[str] = Field(None, description="File name of the Excel document")
-    header_start_line: Optional[int] = Field(None, description="Line where headers start (1-based)")
-    header_end_line: Optional[int] = Field(None, description="Line where headers end (1-based)")
-    content_start_line: Optional[int] = Field(None, description="Line where content starts (1-based)")
-    file_type: Optional[str] = Field(None, description="File type (xlsx, csv)")
-    validation_confidence: Optional[float] = Field(None, description="Confidence score (0.0-1.0)") # Added validation_confidence
+    FileName: Optional[str] = Field(None, description="File name of the Excel document")
+    HeaderStartLine: Optional[int] = Field(None, description="Line where headers start (1-based)")
+    HeaderEndLine: Optional[int] = Field(None, description="Line where headers end (1-based)")
+    ContentStartLine: Optional[int] = Field(None, description="Line where content starts (1-based)")
+    FileType: Optional[str] = Field(None, description="File type (xlsx, csv)")
+    ValidationConfidence: Optional[float] = Field(None, description="Confidence score (0.0-1.0)") # Added ValidationConfidence
 ```
 
 ---

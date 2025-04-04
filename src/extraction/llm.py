@@ -16,10 +16,11 @@ from ..utils.display import console
 from ..models import (
     AppConfig, 
     Data, 
-    Example, 
-    IdentifierModel,
+    Example,
     EXTRACTION_MODELS
 )
+from ..config_manager import get_configuration_manager
+from ..dynamic_model_factory import create_extraction_models_dict
 
 def configure_llm(config: AppConfig):
     """
@@ -163,13 +164,25 @@ FR0007436969	UFF AVENIR SECURITE	12/28/90	7,65	0,04	77,38	1,0988623769	NR	7,6504
 FR0010180786	UFF AVENIR FRANCE	12/15/91	1,13	0,56	90,24	1,0125183721	NR	1,12964721772921 €
 FR0007436969	UFF AVENIR SECURITE	12/23/91	4,73	0,01	78,86	1,0600243577	NR	4,73354198522159 €"""
 
-    # Create a proper example with the consolidated model
-    example_tool_call = IdentifierModel(
-        code="CODE ISIN",
-        code_type="Isin",
-        currency="EUR",
-        cic_code=None
-    )
+    # Get dynamic models
+    config_manager = get_configuration_manager()
+    dynamic_models = create_extraction_models_dict(config_manager)
+    
+    # Get a sample model for the example (use Identifier if available)
+    if "Identifier" in dynamic_models:
+        model_class = dynamic_models["Identifier"]
+        example_tool_call = model_class(
+            code="CODE ISIN",
+            code_type="Isin",
+            currency="EUR",
+            cic_code=None
+        )
+    else:
+        # Use the first available model
+        model_name = next(iter(dynamic_models))
+        model_class = dynamic_models[model_name]
+        # Create an instance with minimal data
+        example_tool_call = model_class()
 
     # Create examples in the format expected by tool_example_to_messages
     examples = [

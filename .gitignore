@@ -1,6 +1,7 @@
 # Ignore the Fluxs - AI Training folder
 Fluxs - AI Training/
 testing/
+ground_truth/
 # Python specific
 __pycache__/
 *.py[cod]

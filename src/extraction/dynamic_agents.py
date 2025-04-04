@@ -1,6 +1,6 @@
-"""LLM-based agents for Excel Header Mapper."""
+"""Dynamic LLM-based agents for Excel Header Mapper."""
 import json
-from typing import Dict, List, Optional, Type, Any
+from typing import Dict, List, Optional, Type, Any, Union
 import re
 
 from ..utils.display import console
@@ -8,25 +8,26 @@ from ..models import (
     AppConfig,
     BaseExtraction,
     ContextModel,
-    ValidationResult,
-    EXTRACTION_MODELS
+    ValidationResult
 )
 from .llm import extract_section, configure_llm
-from ..examples.header_examples import _get_header_examples
-from ..examples.extraction_examples import get_extraction_examples, format_extraction_messages
+from ..config_manager import ConfigurationManager, get_configuration_manager
+from ..examples.dynamic_examples import format_extraction_messages, format_validation_messages
 
 
-class HeaderValidationAgent:
-    """Agent for validating header detection results."""
+class DynamicHeaderValidationAgent:
+    """Agent for validating header detection results using dynamic configuration."""
     
-    def __init__(self, llm):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
         """
         Initialize the header validation agent.
         
         Args:
             llm: LLM instance to use for validation
+            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
+        self.config_manager = config_manager or get_configuration_manager()
         self.messages = self._create_validation_messages()
         
     def validate(self, header_info: ContextModel, markdown_content: str) -> Optional[ContextModel]:
@@ -85,6 +86,9 @@ class HeaderValidationAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # Get header validation configuration
+        validation_config = self.config_manager.get_validation_config()
+        
         # Create system message
         system_message = {
             "role": "system",
@@ -112,7 +116,10 @@ Return your validation as a JSON object with these fields:
 """
         }
         
-        # Get shared examples
+        # Use examples from configuration manager
+        # For now, we'll use hard-coded examples, but in the future this could be part of the config
+        # Note: The header examples are currently not part of the dynamic configuration
+        from ..examples.header_examples import _get_header_examples
         header_examples = _get_header_examples()
         
         # Create examples for the LLM - format them for validation
@@ -137,17 +144,19 @@ Return your validation as a JSON object with these fields:
         return [system_message] + examples
 
 
-class HeaderDetectionAgent:
-    """Agent for detecting header positions in Excel sheets."""
+class DynamicHeaderDetectionAgent:
+    """Agent for detecting header positions in Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
         """
         Initialize the header detection agent.
         
         Args:
             llm: LLM instance to use for detection
+            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
+        self.config_manager = config_manager or get_configuration_manager()
         self.messages = self._create_example_messages()
         
     def detect_headers(self, markdown_content: str) -> Optional[ContextModel]:
@@ -204,6 +213,9 @@ class HeaderDetectionAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # Get header detection configuration
+        header_config = self.config_manager.get_header_detection_config()
+        
         # Create system message
         system_message = {
             "role": "system",
@@ -228,7 +240,10 @@ Return your analysis as a JSON object with these fields:
 """
         }
         
-        # Get shared examples
+        # Use examples from configuration manager
+        # For now, we'll use hard-coded examples, but in the future this could be part of the config
+        # Note: The header examples are currently not part of the dynamic configuration
+        from ..examples.header_examples import _get_header_examples
         header_examples = _get_header_examples()
         
         # Create examples for the LLM - format them for validation
@@ -296,17 +311,19 @@ Return your analysis as a JSON object with these fields:
         )
 
 
-class LLMExtractionAgent:
-    """Agent for extracting structured data from Excel sheets."""
+class DynamicExtractionAgent:
+    """Agent for extracting structured data from Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
         """
         Initialize the extraction agent.
         
         Args:
             llm: LLM instance to use for extraction
+            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
+        self.config_manager = config_manager or get_configuration_manager()
         self.section_messages = {}
         
     def extract_data(self, markdown_content: str, header_info: ContextModel, 
@@ -411,28 +428,23 @@ Return your extraction as a JSON object with these fields:
 """
         }
         
-        # Get examples for this section - use the model class if available
-        if section_name in EXTRACTION_MODELS:
-            model_class = EXTRACTION_MODELS[section_name]
-            examples = get_extraction_examples(model_class)
-        else:
-            examples = get_extraction_examples(section_name)
-        
-        # Format examples for extraction
-        return format_extraction_messages(examples, system_message)
+        # Format examples for extraction using the dynamic examples manager
+        return format_extraction_messages(self.config_manager, section_name, system_message)
 
 
-class ValidationAgent:
-    """Agent for validating and correcting extracted data."""
+class DynamicValidationAgent:
+    """Agent for validating and correcting extracted data using dynamic configuration."""
     
-    def __init__(self, llm):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
         """
         Initialize the validation agent.
         
         Args:
             llm: LLM instance to use for validation
+            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
+        self.config_manager = config_manager or get_configuration_manager()
         self.messages = self._create_validation_messages()
         
     def validate(self, extracted_data: BaseExtraction, markdown_content: str, header_info: ContextModel,
@@ -547,6 +559,10 @@ class ValidationAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # Get validation configuration
+        validation_config = self.config_manager.get_validation_config()
+        confidence_threshold = validation_config.get('confidence_threshold', 0.8)
+        
         # Create system message
         system_message = {
             "role": "system",
@@ -573,35 +589,33 @@ Return your validation as a JSON object with these fields:
 """
         }
         
-        # Get examples for validation
-        from ..examples.extraction_examples import get_extraction_examples, format_validation_messages
-        
-        # Get examples for all model classes in EXTRACTION_MODELS
-        all_examples = []
-        for model_name, model_class in EXTRACTION_MODELS.items():
-            examples = get_extraction_examples(model_class)
-            all_examples.extend(examples)
-        
-        # Format examples for validation
-        return format_validation_messages(all_examples, system_message)
+        # Format examples for validation using the dynamic examples manager
+        return format_validation_messages(self.config_manager, system_message)
 
 
-class AgentPipelineCoordinator:
-    """Coordinator for the agent pipeline."""
+class DynamicAgentPipelineCoordinator:
+    """Coordinator for the dynamic agent pipeline."""
     
-    def __init__(self, config: AppConfig):
+    def __init__(self, config: AppConfig, config_manager: Optional[ConfigurationManager] = None):
         """
         Initialize the agent pipeline coordinator.
         
         Args:
             config: Application configuration
+            config_manager: Configuration manager, or None to use default
         """
         self.config = config
+        self.config_manager = config_manager or get_configuration_manager(config.config_path)
         self.llm = configure_llm(config)
-        self.header_agent = HeaderDetectionAgent(self.llm)
-        self.header_validation_agent = HeaderValidationAgent(self.llm)
-        self.extraction_agent = LLMExtractionAgent(self.llm)
-        self.validation_agent = ValidationAgent(self.llm)
+        
+        # Initialize agents with dynamic configuration
+        self.header_agent = DynamicHeaderDetectionAgent(self.llm, self.config_manager)
+        self.header_validation_agent = DynamicHeaderValidationAgent(self.llm, self.config_manager)
+        self.extraction_agent = DynamicExtractionAgent(self.llm, self.config_manager)
+        self.validation_agent = DynamicValidationAgent(self.llm, self.config_manager)
+        
+        # Get the dynamically configured extraction models
+        self.extraction_models = create_extraction_models_dict(self.config_manager)
         
     def process_markdown(self, markdown_content: str, source_file: str) -> Dict:
         """
@@ -630,9 +644,13 @@ class AgentPipelineCoordinator:
         # Step 2: Validate header detection
         validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
         
+        # Get validation confidence threshold from config
+        validation_config = self.config_manager.get_validation_config()
+        header_confidence_threshold = validation_config.get('confidence_threshold', 0.7)
+        
         # Check if header validation failed or has low confidence
         if not validated_header_info or (hasattr(validated_header_info, 'ValidationConfidence') and 
-                                         validated_header_info.ValidationConfidence < 0.7):
+                                         validated_header_info.ValidationConfidence < header_confidence_threshold):
             console.print("[red]Header validation failed or has low confidence[/red]")
             return {"error": "header detection failed"}
         
@@ -641,9 +659,11 @@ class AgentPipelineCoordinator:
         header_confidence = validated_header_info.ValidationConfidence if hasattr(validated_header_info, 'ValidationConfidence') else 0.7
         
         # Extract file information from source_file
+        console.print(f"[blue]Extracting file information from source file: {source_file}[/blue]")
         FileName = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
         file_ext = os.path.splitext(source_file)[1].lower() if source_file else None
         FileType = file_ext.lstrip('.') if file_ext else None
+        console.print(f"[blue]Extracted file info - name: {FileName}, extension: {file_ext}, type: {FileType}[/blue]")
         
         # Always create a Context section with header detection information
         context_data = {
@@ -664,9 +684,13 @@ class AgentPipelineCoordinator:
         # Add Context section to ordered results first
         ordered_results["Context"] = context_data
         
+        # Get validation confidence threshold from config
+        validation_config = self.config_manager.get_validation_config()
+        extraction_confidence_threshold = validation_config.get('confidence_threshold', 0.8)
+        
         # Step 2: Extract each section
         results = {}  # Temporary dictionary for extraction results
-        for section_name, model_class in EXTRACTION_MODELS.items():
+        for section_name, model_class in self.extraction_models.items():
             # Initialize section results
             results[section_name] = {k: None for k in model_class().model_fields.keys()}
             
@@ -694,7 +718,7 @@ class AgentPipelineCoordinator:
             # Check validation confidence
             if (validated_result and 
                 hasattr(validated_result, 'ValidationConfidence') and 
-                validated_result.ValidationConfidence >= 0.8 and
+                validated_result.ValidationConfidence >= extraction_confidence_threshold and
                 hasattr(validated_result, 'validated_data')):
                 
                 # Update results with validated data
@@ -732,3 +756,18 @@ class AgentPipelineCoordinator:
             ordered_results[section_name] = section_data
         
         return ordered_results
+
+
+# Helper function to get extraction models from config manager
+def create_extraction_models_dict(config_manager: ConfigurationManager) -> Dict[str, Type[BaseExtraction]]:
+    """
+    Create a dictionary mapping section names to model classes.
+    
+    Args:
+        config_manager: Configuration manager instance
+        
+    Returns:
+        Dictionary mapping section names to model classes
+    """
+    from ..dynamic_model_factory import create_extraction_models_dict
+    return create_extraction_models_dict(config_manager)

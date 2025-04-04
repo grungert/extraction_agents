@@ -54,10 +54,10 @@ flowchart TD
 #### ✅ Purpose:
 - Analyze the **first 15 rows** of a sheet (provided in markdown format)
 - Determine:
-  - `header_start_line`
-  - `header_end_line`
-  - `content_start_line`
-  - `validation_confidence` (0.0–1.0)
+  - `HeaderStartLine`
+  - `HeaderEndLine`
+  - `ContentStartLine`
+  - `ValidationConfidence` (0.0–1.0)
 
 #### 🔗 Implementation Pattern:
 Uses this format internally:
@@ -75,10 +75,10 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
 Populates `ContextModel`:
 ```json
 {
-  "header_start_line": 3,
-  "header_end_line": 4,
-  "content_start_line": 5,
-  "validation_confidence": 0.94
+  "HeaderStartLine": 3,
+  "HeaderEndLine": 4,
+  "ContentStartLine": 5,
+  "ValidationConfidence": 0.94
 }
 ```
 
@@ -128,17 +128,17 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
 
 # Detected Headers
 ```json
-{"header_start_line": 0, "header_end_line": 0, "content_start_line": 2}
+{"HeaderStartLine": 0, "HeaderEndLine": 0, "ContentStartLine": 2}
 ```
 ```
 
 #### 🎯 Output:
 ```json
 {
-  "header_start_line": 0,
-  "header_end_line": 0,
-  "content_start_line": 2,
-  "validation_confidence": 0.95
+  "HeaderStartLine": 0,
+  "HeaderEndLine": 0,
+  "ContentStartLine": 2,
+  "ValidationConfidence": 0.95
 }
 ```
 
@@ -267,7 +267,7 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
     "currency": "EUR",
     "cic_code": null
   },
-  "validation_confidence": 0.92,
+  "ValidationConfidence": 0.92,
   "corrections_made": ["Fixed currency format from 'Euro' to 'EUR'"]
 }
 ```
@@ -315,7 +315,7 @@ class ValidationAgent:
         
     def _create_validation_model(self, model_class):
         """Create a validation model that extends the original model."""
-        # Dynamically create a model with validation_confidence and corrections_made
+        # Dynamically create a model with ValidationConfidence and corrections_made
         
     def _create_validation_messages(self):
         """Create example messages for validation."""
@@ -359,33 +359,33 @@ class AgentPipelineCoordinator:
         validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
         
         # Check if header validation failed or has low confidence
-        if not validated_header_info or (hasattr(validated_header_info, 'validation_confidence') and 
-                                         validated_header_info.validation_confidence < 0.7):
+        if not validated_header_info or (hasattr(validated_header_info, 'ValidationConfidence') and 
+                                         validated_header_info.ValidationConfidence < 0.7):
             console.print("[red]Header validation failed or has low confidence[/red]")
             return {"error": "header detection failed"}
         
         # Use validated header info
         header_info = validated_header_info
-        header_confidence = validated_header_info.validation_confidence if hasattr(validated_header_info, 'validation_confidence') else 0.7
+        header_confidence = validated_header_info.ValidationConfidence if hasattr(validated_header_info, 'ValidationConfidence') else 0.7
         
         # Extract file information from source_file
-        file_name = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
+        FileName = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
         file_ext = os.path.splitext(source_file)[1].lower() if source_file else None
-        file_type = file_ext.lstrip('.') if file_ext else None
+        FileType = file_ext.lstrip('.') if file_ext else None
         
         # Always create a Context section with header detection information
         context_data = {
-            "validation_confidence": header_confidence,
-            "file_name": file_name,
-            "header_start_line": None,
-            "header_end_line": None,
-            "content_start_line": None,
-            "file_type": file_type
+            "ValidationConfidence": header_confidence,
+            "FileName": FileName,
+            "HeaderStartLine": None,
+            "HeaderEndLine": None,
+            "ContentStartLine": None,
+            "FileType": FileType
         }
         
         # Copy header detection information to Context section
         if header_info:
-            for field in ["header_start_line", "header_end_line", "content_start_line"]:
+            for field in ["HeaderStartLine", "HeaderEndLine", "ContentStartLine"]:
                 if hasattr(header_info, field) and getattr(header_info, field) is not None:
                     context_data[field] = getattr(header_info, field)
         
@@ -421,8 +421,8 @@ class AgentPipelineCoordinator:
             
             # Check validation confidence
             if (validated_result and 
-                hasattr(validated_result, 'validation_confidence') and 
-                validated_result.validation_confidence >= 0.8 and
+                hasattr(validated_result, 'ValidationConfidence') and 
+                validated_result.ValidationConfidence >= 0.8 and
                 hasattr(validated_result, 'validated_data')):
                 
                 # Update results with validated data
@@ -432,9 +432,9 @@ class AgentPipelineCoordinator:
                         results[section_name][field] = value
                 
                 # Add validation confidence to results
-                results[section_name]['validation_confidence'] = validated_result.validation_confidence
+                results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
                         
-                console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.validation_confidence:.2f}")
+                console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.ValidationConfidence:.2f}")
                 
                 # Log corrections if any
                 if hasattr(validated_result, 'corrections_made') and validated_result.corrections_made:
@@ -450,10 +450,10 @@ class AgentPipelineCoordinator:
                         results[section_name][field] = value
                 
                 # Add a lower validation confidence
-                if validated_result and hasattr(validated_result, 'validation_confidence'):
-                    results[section_name]['validation_confidence'] = validated_result.validation_confidence
+                if validated_result and hasattr(validated_result, 'ValidationConfidence'):
+                    results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
                 else:
-                    results[section_name]['validation_confidence'] = 0.5  # Default medium confidence
+                    results[section_name]['ValidationConfidence'] = 0.5  # Default medium confidence
         
         # Add extraction results to ordered results
         for section_name, section_data in results.items():
@@ -500,18 +500,18 @@ def extract_all_sections(markdown_content, source_file, config, llm_pipeline, me
 # Add validation model base class
 class ValidationResult(BaseModel):
     """Base model for validation results."""
-    validation_confidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
+    ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
     corrections_made: List[str] = Field([], description="List of corrections made during validation")
 
 # Update ContextModel
 class ContextModel(BaseExtraction):
     """Model for extracting context information."""
-    file_name: Optional[str] = Field(None, description="File name of the Excel document")
-    header_start_line: Optional[int] = Field(None, description="Line where headers start (1-based)")
-    header_end_line: Optional[int] = Field(None, description="Line where headers end (1-based)")
-    content_start_line: Optional[int] = Field(None, description="Line where content starts (1-based)")
-    file_type: Optional[str] = Field(None, description="File type (xlsx, csv)")
-    # validation_confidence is inherited from BaseExtraction
+    FileName: Optional[str] = Field(None, description="File name of the Excel document")
+    HeaderStartLine: Optional[int] = Field(None, description="Line where headers start (1-based)")
+    HeaderEndLine: Optional[int] = Field(None, description="Line where headers end (1-based)")
+    ContentStartLine: Optional[int] = Field(None, description="Line where content starts (1-based)")
+    FileType: Optional[str] = Field(None, description="File type (xlsx, csv)")
+    # ValidationConfidence is inherited from BaseExtraction
 ```
 
 ---

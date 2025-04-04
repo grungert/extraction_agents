@@ -20,7 +20,7 @@ def get_denomination_examples() -> List[Dict[str, Any]]:
             "compartment_name": None,
             "instrument_name": "Fund Name",
             "share_type": None,
-            "validation_confidence": 0.92
+            "ValidationConfidence": 0.92
         })
     ]
     
@@ -47,7 +47,7 @@ def get_identifier_examples() -> List[Dict[str, Any]]:
             "CodeType": "Isin",
             "Currency": "[EUR]",
             "CIC Code": "",
-            "validation_confidence": 0.99
+            "ValidationConfidence": 0.99
         }),
          ("""| ODDO BHF Euro High Yield Bond CI   | LU0115288721   | 940818   |   nan |   nan | EUR   | 36.804              | 36.775              | 0.0008    | 36.783              | 0.0006      | 159247523.58   | 4326929.04         |   nan |   nan | 0   |   nan |   nan | 835941068.04   |
 |:-----------------------------------|:---------------|:---------|------:|------:|:------|:--------------------|:--------------------|:----------|:--------------------|:------------|:---------------|:-------------------|------:|------:|:----|------:|------:|:---------------|
@@ -63,7 +63,7 @@ def get_identifier_examples() -> List[Dict[str, Any]]:
             "CodeType": "Isin",
             "Currency": "Curr",
             "CIC Code": "",
-            "validation_confidence": 0.91
+            "ValidationConfidence": 0.91
         })
     ]
     
@@ -134,7 +134,7 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     
     # Modify some fields to demonstrate validation
     for field, value in modified_json.items():
-        if field == "validation_confidence":
+        if field == "ValidationConfidence":
             continue
             
         # For string fields, modify them slightly
@@ -151,7 +151,7 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     # Create the expected validation output
     validation_example["validation_output"] = {
         "validated_data": example["json"],
-        "validation_confidence": example["json"].get("validation_confidence", 0.9),
+        "ValidationConfidence": example["json"].get("ValidationConfidence", 0.9),
         "corrections_made": ["Corrected data based on table context"]
     }
     
