@@ -548,7 +548,7 @@ class DynamicValidationAgent:
         # that combines the original model with validation fields
         
         class CombinedValidationModel(ValidationResult):
-            validated_data: model_class
+            ValidatedData: model_class
             
         return CombinedValidationModel
         
@@ -583,9 +583,9 @@ Guidelines:
 6. Use examples to guide your validation process
 
 Return your validation as a JSON object with these fields:
-- validated_data: The corrected data
+- ValidatedData: The corrected data
 - ValidationConfidence: Your confidence score (0.0-1.0)
-- corrections_made: List of corrections you made
+- CorrectionsMade: List of corrections you made
 """
         }
         
@@ -719,11 +719,11 @@ class DynamicAgentPipelineCoordinator:
             if (validated_result and 
                 hasattr(validated_result, 'ValidationConfidence') and 
                 validated_result.ValidationConfidence >= extraction_confidence_threshold and
-                hasattr(validated_result, 'validated_data')):
+                hasattr(validated_result, 'ValidatedData')):
                 
                 # Update results with validated data
-                validated_data = validated_result.validated_data.model_dump()
-                for field, value in validated_data.items():
+                ValidatedData = validated_result.ValidatedData.model_dump()
+                for field, value in ValidatedData.items():
                     if value is not None:
                         results[section_name][field] = value
                 
@@ -733,9 +733,9 @@ class DynamicAgentPipelineCoordinator:
                 console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.ValidationConfidence:.2f}")
                 
                 # Log corrections if any
-                if hasattr(validated_result, 'corrections_made') and validated_result.corrections_made:
+                if hasattr(validated_result, 'CorrectionsMade') and validated_result.CorrectionsMade:
                     console.print(f"[blue]Corrections made:[/blue]")
-                    for correction in validated_result.corrections_made:
+                    for correction in validated_result.CorrectionsMade:
                         console.print(f"  • {correction}")
             else:
                 # Use original extraction if validation fails

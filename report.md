@@ -286,14 +286,14 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
 
 ```json
 {
-  "validated_data": {
+  "ValidatedData": {
     "code": "CODE ISIN",
     "code_type": "Isin",
     "currency": "EUR",
     "cic_code": null
   },
   "ValidationConfidence": 0.92,
-  "corrections_made": ["Fixed currency format from 'Euro' to 'EUR'"]
+  "CorrectionsMade": ["Fixed currency format from 'Euro' to 'EUR'"]
 }
 ```
 
@@ -346,10 +346,10 @@ class ValidationAgent:
 
     def _create_validation_model(self, model_class):
         """Create a validation model that extends the original model."""
-        # Dynamically create a model with ValidationConfidence and corrections_made
+        # Dynamically create a model with ValidationConfidence and CorrectionsMade
         class ValidatedModel(model_class):
             ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
-            corrections_made: List[str] = Field([], description="List of corrections made during validation")
+            CorrectionsMade: List[str] = Field([], description="List of corrections made during validation")
         return ValidatedModel
 
     def _create_validation_messages(self):
@@ -414,7 +414,7 @@ from pydantic import BaseModel, Field
 class ValidationResult(BaseModel):
     """Base model for validation results."""
     ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
-    corrections_made: List[str] = Field([], description="List of corrections made during validation")
+    CorrectionsMade: List[str] = Field([], description="List of corrections made during validation")
 
 # Update ContextModel
 class ContextModel(BaseModel): # Changed inheritance from BaseExtraction to BaseModel
