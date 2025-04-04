@@ -32,7 +32,7 @@ class BaseExtraction(BaseModel):
 class ValidationResult(BaseModel):
     """Base model for validation results."""
     ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
-    corrections_made: List[str] = Field([], description="List of corrections made during validation")
+    CorrectionsMade: List[str] = Field([], description="List of corrections made during validation")
 
 # Context section
 class ContextModel(BaseExtraction):

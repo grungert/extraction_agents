@@ -415,9 +415,9 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     
     # Create the expected validation output
     validation_example["validation_output"] = {
-        "validated_data": example["json"],
+        "ValidatedData": example["json"],
         "ValidationConfidence": example["json"].get("ValidationConfidence", 0.9),
-        "corrections_made": ["Corrected data based on table context"]
+        "CorrectionsMade": ["Corrected data based on table context"]
     }
     
     return validation_example

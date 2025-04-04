@@ -261,14 +261,14 @@ def extract_section(markdown_content, section_name, model_class, messages, llm)
 #### 🎯 Output:
 ```json
 {
-  "validated_data": {
+  "ValidatedData": {
     "code": "CODE ISIN",
     "code_type": "Isin",
     "currency": "EUR",
     "cic_code": null
   },
   "ValidationConfidence": 0.92,
-  "corrections_made": ["Fixed currency format from 'Euro' to 'EUR'"]
+  "CorrectionsMade": ["Fixed currency format from 'Euro' to 'EUR'"]
 }
 ```
 
@@ -315,7 +315,7 @@ class ValidationAgent:
         
     def _create_validation_model(self, model_class):
         """Create a validation model that extends the original model."""
-        # Dynamically create a model with ValidationConfidence and corrections_made
+        # Dynamically create a model with ValidationConfidence and CorrectionsMade
         
     def _create_validation_messages(self):
         """Create example messages for validation."""
@@ -423,11 +423,11 @@ class AgentPipelineCoordinator:
             if (validated_result and 
                 hasattr(validated_result, 'ValidationConfidence') and 
                 validated_result.ValidationConfidence >= 0.8 and
-                hasattr(validated_result, 'validated_data')):
+                hasattr(validated_result, 'ValidatedData')):
                 
                 # Update results with validated data
-                validated_data = validated_result.validated_data.model_dump()
-                for field, value in validated_data.items():
+                ValidatedData = validated_result.ValidatedData.model_dump()
+                for field, value in ValidatedData.items():
                     if value is not None:
                         results[section_name][field] = value
                 
@@ -437,9 +437,9 @@ class AgentPipelineCoordinator:
                 console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.ValidationConfidence:.2f}")
                 
                 # Log corrections if any
-                if hasattr(validated_result, 'corrections_made') and validated_result.corrections_made:
+                if hasattr(validated_result, 'CorrectionsMade') and validated_result.CorrectionsMade:
                     console.print(f"[blue]Corrections made:[/blue]")
-                    for correction in validated_result.corrections_made:
+                    for correction in validated_result.CorrectionsMade:
                         console.print(f"  • {correction}")
             else:
                 # Use original extraction if validation fails
@@ -501,7 +501,7 @@ def extract_all_sections(markdown_content, source_file, config, llm_pipeline, me
 class ValidationResult(BaseModel):
     """Base model for validation results."""
     ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
-    corrections_made: List[str] = Field([], description="List of corrections made during validation")
+    CorrectionsMade: List[str] = Field([], description="List of corrections made during validation")
 
 # Update ContextModel
 class ContextModel(BaseExtraction):
