@@ -150,15 +150,15 @@ def process_file(file_path, config, llm_pipeline, messages):
         tuple: (extraction_results, sheets_processed, fields_extracted)
     """
     try:
-        file_name = os.path.basename(file_path)
+        FileName = os.path.basename(file_path)
         sheet_stats = {}
         
         # Log start of sheet preparation
-        console.print(f"[bold blue]Preparing sheets for {file_name}...[/bold blue]")
+        console.print(f"[bold blue]Preparing sheets for {FileName}...[/bold blue]")
         prep_start_time = time.time()
         all_sheet_markdowns = prepare_excel_sheets_markdown(file_path, config)
         prep_duration = time.time() - prep_start_time
-        console.print(f"[green]✓[/green] Preparing sheets for {file_name} completed in {format_time_delta(prep_duration)}")
+        console.print(f"[green]✓[/green] Preparing sheets for {FileName} completed in {format_time_delta(prep_duration)}")
         
         if not all_sheet_markdowns:
             console.print(Panel(
@@ -173,7 +173,7 @@ def process_file(file_path, config, llm_pipeline, messages):
         fields_extracted = 0
         
         # Process each sheet
-        console.print(f"[bold]Processing {len(all_sheet_markdowns)} sheets for {file_name}...[/bold]")
+        console.print(f"[bold]Processing {len(all_sheet_markdowns)} sheets for {FileName}...[/bold]")
         
         for sheet_idx, (sheet_name, markdown_content) in enumerate(all_sheet_markdowns.items()):
             # Show current sheet being processed
@@ -251,7 +251,7 @@ def process_file(file_path, config, llm_pipeline, messages):
             ])
         
         sheet_table = create_summary_table(
-            f"Sheet Processing Summary for {file_name}", 
+            f"Sheet Processing Summary for {FileName}", 
             header_columns, 
             rows
         )
@@ -305,21 +305,21 @@ def process_directory(config: AppConfig):
     
     # Process files
     for i, file_path in enumerate(all_files):
-        file_name = os.path.basename(file_path)
+        FileName = os.path.basename(file_path)
         
         # Show current file being processed
-        console.print(f"[cyan]File {i+1}/{total_files}: {file_name}[/cyan]")
+        console.print(f"[cyan]File {i+1}/{total_files}: {FileName}[/cyan]")
         
         # Record start time for this file
         stats.record_file_start(file_path)
         
         try:
             # Process file
-            console.print(f"[bold blue]Processing {file_name}...[/bold blue]")
+            console.print(f"[bold blue]Processing {FileName}...[/bold blue]")
             process_start_time = time.time()
             results, sheets_processed, fields_extracted = process_file(file_path, config, llm_pipeline, messages)
             process_duration = time.time() - process_start_time
-            console.print(f"[green]✓[/green] Processing {file_name} completed in {format_time_delta(process_duration)}")
+            console.print(f"[green]✓[/green] Processing {FileName} completed in {format_time_delta(process_duration)}")
             
             if results is not None:
                 # Record successful processing
@@ -330,7 +330,7 @@ def process_directory(config: AppConfig):
                 time_remaining = stats.get_estimated_time_remaining(files_remaining)
                 
                 console.print(Panel(
-                    f"[green]Successfully processed {file_name}[/green]\n"
+                    f"[green]Successfully processed {FileName}[/green]\n"
                     f"• Sheets: [cyan]{sheets_processed}[/cyan]\n"
                     f"• Fields: [cyan]{fields_extracted}[/cyan]\n"
                     f"• Processing time: [cyan]{format_time_delta(stats.file_times[file_path]['duration'])}[/cyan]",
@@ -342,14 +342,14 @@ def process_directory(config: AppConfig):
                 # Record failed processing
                 stats.record_file_end(file_path, success=False)
                 console.print(Panel(
-                    f"[yellow]No data extracted from {file_name}[/yellow]",
+                    f"[yellow]No data extracted from {FileName}[/yellow]",
                     border_style="yellow"
                 ))
         except Exception as e:
             # Record error
             stats.record_file_end(file_path, success=False)
             console.print(Panel(
-                f"[red]Error processing {file_name}:[/red]\n"
+                f"[red]Error processing {FileName}:[/red]\n"
                 f"[yellow]{type(e).__name__}: {str(e)}[/yellow]",
                 border_style="red"
             ))

@@ -141,8 +141,8 @@ df_filtered = df_slice_clean[filtered_cols_clean]
 markdown_table = df_slice_clean.to_markdown(index=False)
 
 # Output metadata
-validation_confidence = round(random.uniform(0.90, 1.00), 2)
-json_output_fields["validation_confidence"] = validation_confidence
+ValidationConfidence = round(random.uniform(0.90, 1.00), 2)
+json_output_fields["ValidationConfidence"] = ValidationConfidence
 
 # === Markdown Output ===
 print("\n# Original Table (Markdown)")

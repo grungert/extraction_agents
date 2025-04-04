@@ -24,10 +24,10 @@ def _get_header_examples() -> List[Dict]:
 | ODDO BHF Euro High Yield Bond CI | LU0115288721 | 940818 | NaN | NaN | EUR | 36.804 | 36.775 | 0.000789 | 36.783 | 0.000571 | 159247523.58 | 4326929.04 | NaN | NaN | 0 | NaN | NaN | 835941068.04 |
 """,
         {
-            "header_start_line": 8,
-            "header_end_line": 10,
-            "content_start_line": 11,
-            "validation_confidence": 0.95
+            "HeaderStartLine": 8,
+            "HeaderEndLine": 10,
+            "ContentStartLine": 11,
+            "ValidationConfidence": 0.95
         }),
 
         # Example 2
@@ -43,10 +43,10 @@ def _get_header_examples() -> List[Dict]:
 | FR0007437124 | UFF AVENIR DIVERSIFIE | 1991-12-27 | 1.684562 | 0.246967 | 80.869630 | 1.020831 | NR | 1.684562 |
 | FR0007436969 | UFF AVENIR SECURITE | 1992-12-15 | 3.096240 | 0.001524 | 85.450723 | 1.036234 | NR | 3.096240 |""",
         {
-            "header_start_line": 0,
-            "header_end_line": 0,
-            "content_start_line": 1,
-            "validation_confidence": 0.92
+            "HeaderStartLine": 0,
+            "HeaderEndLine": 0,
+            "ContentStartLine": 1,
+            "ValidationConfidence": 0.92
         }),
 
         # Example 3
@@ -58,10 +58,10 @@ def _get_header_examples() -> List[Dict]:
 | Jyske Invest Global Equities CL | DK0016259930 | USD | 518.992 | 23243 | 12062931.056 | 2025-01-30 00:00:00 |
 | Jyske Invest Stable Strategy EUR | DK0016262058 | EUR | 188.758967 | 294096 | 55513257.158832 | 2025-01-30 00:00:00 |""",
         {
-            "header_start_line": None,
-            "header_end_line": None,
-            "content_start_line": 1,
-            "validation_confidence": 0.97
+            "HeaderStartLine": None,
+            "HeaderEndLine": None,
+            "ContentStartLine": 1,
+            "ValidationConfidence": 0.97
         })
     ]
 

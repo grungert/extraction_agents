@@ -28,9 +28,9 @@ with open(json_file_path, 'r') as json_file:
     metadata = json.load(json_file)
 
 # Extract relevant metadata
-header_start_line = metadata["Context"]["HeaderStartLine"]
-header_end_line = metadata["Context"]["HeaderEndLine"]
-content_start_line = metadata["Context"]["ContentStartLine"]
+HeaderStartLine = metadata["Context"]["HeaderStartLine"]
+HeaderEndLine = metadata["Context"]["HeaderEndLine"]
+ContentStartLine = metadata["Context"]["ContentStartLine"]
 
 # Step 2: Read the first 15 rows of the Excel file using pandas
 df = pd.read_excel(excel_file_path, nrows=15, header=None)
@@ -48,15 +48,15 @@ markdown_content = result.text_content
 print("# Original Table\n")
 print(markdown_content)
 
-# Step 5: Generate a random validation_confidence score between 0.90 and 1.00
-validation_confidence = round(random.uniform(0.90, 1.00), 2)
+# Step 5: Generate a random ValidationConfidence score between 0.90 and 1.00
+ValidationConfidence = round(random.uniform(0.90, 1.00), 2)
 
 # Step 6: Create the JSON structure capturing the context
 context = {
-    "header_start_line": header_start_line,
-    "header_end_line": header_end_line,
-    "content_start_line": content_start_line,
-    "validation_confidence": validation_confidence
+    "HeaderStartLine": HeaderStartLine,
+    "HeaderEndLine": HeaderEndLine,
+    "ContentStartLine": ContentStartLine,
+    "ValidationConfidence": ValidationConfidence
 }
 
 # Convert the context dictionary to a JSON string

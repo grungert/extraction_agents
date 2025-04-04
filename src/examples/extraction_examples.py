@@ -292,7 +292,7 @@ def get_identifier_examples() -> List[Dict[str, Any]]:
             "CodeType": " ",
             "Currency": "Currency",
             "CIC Code": "",
-            "validation_confidence": 0.99
+            "ValidationConfidence": 0.99
         }),
         # Example 2
          ("""| Fund Name                          | ISIN Code      | WKN      | Curr  | NAV per share       | Prior day           | prior day | Prior Month         | prior month | Total NAV      | Shares Outstanding | TIS | in base        |
@@ -399,7 +399,7 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     
     # Modify some fields to demonstrate validation
     for field, value in modified_json.items():
-        if field == "validation_confidence":
+        if field == "ValidationConfidence":
             continue
             
         # For string fields, modify them slightly
@@ -416,7 +416,7 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     # Create the expected validation output
     validation_example["validation_output"] = {
         "validated_data": example["json"],
-        "validation_confidence": example["json"].get("validation_confidence", 0.9),
+        "ValidationConfidence": example["json"].get("ValidationConfidence", 0.9),
         "corrections_made": ["Corrected data based on table context"]
     }
     
