@@ -1,5 +1,6 @@
 """Dynamic LLM-based agents for Excel Header Mapper."""
 import json
+import time  # Import the time module
 from typing import Dict, List, Optional, Type, Any, Union
 import re
 
@@ -553,6 +554,7 @@ class DynamicAgentPipelineCoordinator:
         from collections import OrderedDict
         import os
         ordered_results = OrderedDict()
+        start_time = time.perf_counter()  # Start timer
         
         # Step 1: Detect headers
         header_info = self.header_agent.detect_headers(markdown_content)
@@ -675,6 +677,16 @@ class DynamicAgentPipelineCoordinator:
         # Add extraction results to ordered results
         for section_name, section_data in results.items():
             ordered_results[section_name] = section_data
+            
+        end_time = time.perf_counter()  # End timer
+        processing_time = end_time - start_time  # Calculate duration
+        
+        # Add processing time to context data
+        if "Context" in ordered_results:
+            ordered_results["Context"]["ProcessingTimeSeconds"] = round(processing_time, 3)
+            
+        # Print processing time to console
+        console.print(f"[cyan]Total processing time for {source_file}: {processing_time:.3f} seconds[/cyan]")
         
         return ordered_results
 
