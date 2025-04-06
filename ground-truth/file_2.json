@@ -1,0 +1,52 @@
+{
+  "Context" : {
+    "FileName": "8169693_LFP_VL.2025.01.13.csv",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "csv"
+  },
+  "Identifier": [{
+    "Code": "ISIN",
+    "CodeType": "Isin",
+    "Currency": "Devise",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "Libellé",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "VL",
+    "NavDate": "Date VL"
+  },
+  "MarketCap": {
+    "ReferenceDate": "Date VL",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "Encours_Global",
+    "ShareAssetValue": "Encours Net",
+    "Number of Shares": "Nb Parts"
+  },
+  "CorporateAction": [{
+    "Currency": "Devise",
+    "Type": "",
+    "Value": "",
+    "ExecutionDate": "Date VL",
+    "PaymentDate": "",
+    "RecordDate": "",
+    "DistributionRate": ""
+  }],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "Context" : {
+    "FileName": "8217734_Export_Last_NAV.2025.01.30.csv",
+    "HeaderStartLine": 0,
+    "HeaderEndLine": 0,
+    "ContentStartLine": 1,
+    "FileType": "csv"
+  },
+  "Identifier": [{
+    "Code": "Column2",
+    "CodeType": "Isin",
+    "Currency": "Column7",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "Column1",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "Column4",
+    "NavDate": "Column3"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "Column6",
+    "ShareAssetValue": "",
+    "Number of Shares": "Column5"
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "",
+      "Value": "",
+      "ExecutionDate": "",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "DistributionRate": ""
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

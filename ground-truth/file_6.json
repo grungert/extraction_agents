@@ -1,0 +1,52 @@
+{
+  "Context" : {
+    "FileName": "8206743_COUPONS pour externe.2025.01.27.xls",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "xls"
+  },
+  "Identifier": [{
+    "Code": "CODE ISIN",
+    "CodeType": "Isin",
+    "Currency": "[EUR]",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "FCP",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "",
+    "NavDate": "DATE"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "",
+    "ShareAssetValue": "",
+    "Number of Shares": ""
+  },
+  "CorporateAction": [{
+    "Currency": "EUR",
+    "Type": "Coupon",
+    "Value": "COUPON",
+    "ExecutionDate": "DATE",
+    "PaymentDate": "",
+    "RecordDate": "",
+    "DistributionRate": ""
+  }],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

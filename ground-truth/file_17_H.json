@@ -1,0 +1,54 @@
+{
+  "Context" : {
+    "FileName": "8208700_PIMCO Global Investor Series PLC Re Investment Notice January 2025.2025.01.28.xlsx",
+    "HeaderStartLine": 11,
+    "HeaderEndLine": 12,
+    "ContentStartLine": 13,
+    "FileType": "xlsx"
+  },
+  "Identifier": [{
+    "Code": "ISIN",
+    "CodeType": "Isin",
+    "Currency": "Denomination",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "Fund Name",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "Re-Invest Net Asset Value Per Share",
+    "NavDate": "Payable Date"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "",
+    "ShareAssetValue": "",
+    "Number of Shares": ""
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "Dividend",
+      "Value": "",
+      "ExecutionDate": "Ex Date",
+      "PaymentDate": "Payable Date",
+      "RecordDate": "Record Date",
+      "DistributionRate": "Per Share Rate"
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

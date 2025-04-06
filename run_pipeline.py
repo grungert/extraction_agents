@@ -13,7 +13,7 @@
 #   "langfuse>=0.1.0"
 # ]
 # ///
-"""Test script for the dynamic LLM extraction pipeline."""
+"""LLM-based extraction pipeline for parsing Excel files."""
 import json
 import os
 import sys
@@ -28,9 +28,9 @@ from src.extraction.excel import excel_to_markdown
 
 
 def main():
-    """Run the dynamic agent pipeline test."""
+    """Run the dynamic agent pipeline."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Test dynamic LLM extraction pipeline")
+    parser = argparse.ArgumentParser(description="LLM-based extraction pipeline for Excel files")
     parser.add_argument("--config", type=str, default="config/full_config.json", 
                         help="Path to configuration file")
     parser.add_argument("--file", type=str, default=None,
@@ -128,7 +128,7 @@ def main():
             json.dump(results, f, indent=2)
         console.print(f"[green]Results written to {output_path}[/green]")
     
-    console.print("[green]Dynamic pipeline test completed successfully![/green]")
+    console.print("[green]Processing completed successfully![/green]")
 
 
 if __name__ == "__main__":

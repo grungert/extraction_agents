@@ -1,40 +1,7 @@
 """Configuration manager for the dynamically configurable extraction system."""
 import os
 import json
-from typing import Dict, List, Any, Optional, Type, Union
-import re
-
-from .models import BaseExtraction
-
-
-def convert_pascal_to_snake(name: str) -> str:
-    """
-    Convert PascalCase to snake_case.
-    
-    Args:
-        name: String in PascalCase
-        
-    Returns:
-        String in snake_case
-    """
-    # Insert underscore before uppercase letters and convert to lowercase
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-
-
-def convert_snake_to_pascal(name: str) -> str:
-    """
-    Convert snake_case to PascalCase.
-    
-    Args:
-        name: String in snake_case
-        
-    Returns:
-        String in PascalCase
-    """
-    # Split by underscore, capitalize each part, and join
-    return ''.join(word.capitalize() for word in name.split('_'))
-
+from typing import Dict, List, Any, Optional
 
 class ConfigurationManager:
     """Manager for loading and validating configuration from JSON."""
@@ -149,6 +116,15 @@ class ConfigurationManager:
         """
         return self.config.get("header_detection", {}).get("config", {})
     
+    def get_header_examples(self) -> List[Dict[str, Any]]:
+        """
+        Get the header detection examples.
+        
+        Returns:
+            List of header example dictionaries
+        """
+        return self.config.get("header_detection", {}).get("examples", [])
+    
     def get_validation_config(self) -> Dict[str, Any]:
         """
         Get the validation configuration.
@@ -157,6 +133,16 @@ class ConfigurationManager:
             Dictionary containing validation configuration
         """
         return self.config.get("validation", {})
+        
+    def get_default_example_confidence(self) -> float:
+        """
+        Get the default confidence score to use for examples that don't specify one.
+        
+        Returns:
+            Default confidence score (0.0-1.0)
+        """
+        validation_config = self.get_validation_config()
+        return validation_config.get("default_example_confidence", 0.9)
     
     def get_extraction_models(self) -> List[Dict[str, Any]]:
         """

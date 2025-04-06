@@ -1,6 +1,6 @@
 # Ignore the Fluxs - AI Training folder
 Fluxs - AI Training/
-testing/
+json_outputs/
 ground_truth/
 # Python specific
 __pycache__/
@@ -26,7 +26,6 @@ wheels/
 
 # Results and temporary files
 json_outputs/
-*.json
 
 # IDE files
 .idea/

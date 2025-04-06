@@ -15,7 +15,7 @@ class ModelConfig(BaseModel):
 
 class AppConfig(BaseModel):
     """Application configuration."""
-    input_dir: str = "testing"
+    input_dir: str = "input"
     output_dir: str = "json_outputs"
     start_row: int = 0
     end_row: int = 15

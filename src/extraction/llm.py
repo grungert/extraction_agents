@@ -138,72 +138,7 @@ def tool_example_to_messages(example: Example) -> List[BaseMessage]:
         console.print(f"[red]Error converting example to messages: {str(e)}[/red]")
         raise
 
-def initialize_llm_pipeline(config: AppConfig):
-    """
-    Initialize the LLM and extraction pipeline.
-    
-    Args:
-        config (AppConfig): Application configuration
-        
-    Returns:
-        tuple: (runnable, messages) - The extraction pipeline and example messages
-    """
-    # Configure LLM with the provided configuration
-    llm = configure_llm(config)
-    
-    # Create general extraction prompt template (no section focus)
-    prompt = create_extraction_prompt()
-    
-    # Define example data
-    example_data = """CODE ISIN FCP	DATE	COUPON	CREDIT D'IMPÔT	VL APRES DETACH.	Coefficient	Ouvrant à PL	NET du PL
-FR0007436969	UFF AVENIR SECURITE	12/27/89	5,53	0,03	75,42	1,0732752522	NR	5,52627687485613 €
-FR0007437124	UFF AVENIR DIVERSIFIE	12/27/89	1,30	0,65	90,64	1,0143469851	NR	1,30039011703511 €
-FR0010180786	UFF AVENIR FRANCE	12/27/89	1,27	0,41	106,70	1,0118588370	NR	1,26532684307051 €
-FR0007437124	UFF AVENIR DIVERSIFIE	12/26/90	0,04	0,02	74,65	1,0005310024	NR	0,0396367444817267 €
-FR0007436969	UFF AVENIR SECURITE	12/28/90	7,65	0,04	77,38	1,0988623769	NR	7,65043 €
-FR0010180786	UFF AVENIR FRANCE	12/15/91	1,13	0,56	90,24	1,0125183721	NR	1,12964721772921 €
-FR0007436969	UFF AVENIR SECURITE	12/23/91	4,73	0,01	78,86	1,0600243577	NR	4,73354198522159 €"""
-
-    # Get dynamic models
-    config_manager = get_configuration_manager()
-    dynamic_models = create_extraction_models_dict(config_manager)
-    
-    # Get a sample model for the example (use Identifier if available)
-    if "Identifier" in dynamic_models:
-        model_class = dynamic_models["Identifier"]
-        example_tool_call = model_class(
-            code="CODE ISIN",
-            code_type="Isin",
-            currency="EUR",
-            cic_code=None
-        )
-    else:
-        # Use the first available model
-        model_name = next(iter(dynamic_models))
-        model_class = dynamic_models[model_name]
-        # Create an instance with minimal data
-        example_tool_call = model_class()
-
-    # Create examples in the format expected by tool_example_to_messages
-    examples = [
-        {
-            "input": example_data,
-            "tool_calls": [Data(data_extracted=[example_tool_call])]
-        }
-    ]
-
-    # Convert examples to messages format
-    messages = []
-    for example in examples:
-        messages.extend(tool_example_to_messages(example))
-
-    # Create extraction pipeline
-    runnable = prompt | llm.with_structured_output(
-        schema=Data,
-        include_raw=False,
-    )
-    
-    return runnable, messages
+# initialize_llm_pipeline function removed - not used by the dynamic pipeline
 
 def extract_section(markdown_content, section_name, model_class, messages, llm):
     """

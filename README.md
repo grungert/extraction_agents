@@ -1,151 +1,58 @@
-# Excel Header Mapper with LLM-Based Agents
+# Excel Header Mapper
 
-This project implements an intelligent Excel header mapping system using LLM-based agents. It can analyze Excel/CSV files, detect headers, extract structured data, and validate the results.
+A dynamic LLM-based system for extracting structured data from Excel files.
 
-## Architecture
+## Features
 
-The system uses a pipeline of three LLM-based agents:
+- Automatic header detection
+- Configurable field extraction
+- Validation with confidence scoring
+- Local LLM integration
+- Dynamic model configuration via JSON
 
-```mermaid
-flowchart TD
-    Input[Excel/CSV Input] --> Convert[Convert to Markdown]
-    Convert --> HeaderDetect[HeaderDetectionAgent]
-    
-    HeaderDetect -->|Confidence ≥ 0.8| Extract[LLMExtractionAgent]
-    HeaderDetect -->|Confidence < 0.8| FallbackH[Header Fallback]
-    FallbackH --> Extract
-    
-    Extract --> Validate[ValidationAgent]
-    
-    Validate -->|Confidence ≥ 0.8| Output[JSON Output]
-    Validate -->|Confidence < 0.8| Refine[Refinement Loop]
-    Refine --> Extract
-```
+## Getting Started
 
-## Agents
+### Prerequisites
 
-### 1. HeaderDetectionAgent
+- Python 3.10+
+- Local LLM (e.g., Gemma 3)
 
-Analyzes the first 15 rows of a sheet to determine:
-- Where headers start and end
-- Where content starts
-- Confidence score for the detection
-
-### 2. LLMExtractionAgent
-
-Processes the structured markdown with identified headers to:
-- Extract data for each section (identifier, denomination, etc.)
-- Use few-shot prompting for accurate extraction
-
-### 3. ValidationAgent
-
-Validates and corrects the extracted data:
-- Checks for inconsistencies and errors
-- Provides confidence score for validation
-- Lists corrections made
-
-## Usage
-
-### Command Line Interface
+### Installation
 
 ```bash
-python cli_header_mapper.py --input_dir=<directory> --output_dir=<output_directory>
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### Test Script
-
-To test the agent pipeline on a single file:
+### Usage
 
 ```bash
-python test_agent_pipeline.py <path_to_excel_or_csv_file>
+# Process all Excel files in input/ directory
+python run_pipeline.py
+
+# Process a specific Excel file
+python run_pipeline.py --file path/to/your/file.xlsx
+
+# Specify a particular sheet
+python run_pipeline.py --file path/to/your/file.xlsx --sheet "Sheet2"
+
+# Specify a different config file
+python run_pipeline.py --config config/alternative_config.json
+
+# Specify a custom output location
+python run_pipeline.py --file path/to/your/file.xlsx --output custom_output.json
 ```
 
-## Implementation Details
+## Directory Structure
 
-The system is implemented with the following components:
-
-1. **Data Models** (`src/models.py`):
-   - Defines the data structures for extraction
-   - Includes validation models with confidence scoring
-
-2. **Agent Implementation** (`src/extraction/agents.py`):
-   - Implements the three LLM-based agents
-   - Includes the pipeline coordinator
-
-3. **Processing Logic** (`src/processing.py`):
-   - Orchestrates the extraction process
-   - Handles file I/O and statistics
-
-4. **Excel Processing** (`src/extraction/excel.py`):
-   - Converts Excel/CSV files to markdown format
+- `config/` - Configuration files
+- `input/` - Place Excel files here for processing
+- `json_outputs/` - Extracted JSON results
+- `src/` - Source code
+  - `extraction/` - Core extraction logic
+  - `examples/` - Example data for LLM prompting
+  - `utils/` - Utility functions
 
 ## Configuration
 
-The system can be configured with the following options:
-
-- `input_dir`: Directory containing Excel/CSV files
-- `output_dir`: Directory for JSON output
-- `start_row`: First row to read (0-based)
-- `end_row`: Last row to read (exclusive)
-- `all_sheets`: Process all sheets in Excel files
-- `model_name`: LLM model name
-- `base_url`: LLM API base URL
-- `api_key`: API key for the LLM
-- `temperature`: Temperature for LLM generation
-- `max_retries`: Maximum retries for LLM API calls
-
-## Monitoring with Langfuse
-
-This project supports monitoring LLM interactions using [Langfuse](https://langfuse.com). Langfuse provides observability for LLM applications, allowing you to track:
-
-- Performance metrics
-- Token usage
-- Response quality
-- Error rates
-
-### Setup
-
-1. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Set up your Langfuse configuration in the `.env` file:
-   ```
-   LANGFUSE_ENABLED=true
-   LANGFUSE_PUBLIC_KEY=your_public_key_here
-   LANGFUSE_SECRET_KEY=your_secret_key_here
-   LANGFUSE_HOST=https://cloud.langfuse.com  # EU region
-   # LANGFUSE_HOST=https://us.cloud.langfuse.com  # US region
-   ```
-
-3. Install the required dependency:
-   ```bash
-   pip install python-dotenv langfuse
-   ```
-
-### Features
-
-- **Automatic Tracing**: Each extraction operation is automatically traced
-- **Error Tracking**: Failed extractions are logged with detailed error information
-- **Metadata**: Each trace includes metadata about the section being extracted
-- **Authentication Check**: The system verifies Langfuse connectivity at startup
-
-## Development
-
-### Adding New Extraction Models
-
-1. Define a new model class in `src/models.py`
-2. Add the model to `EXTRACTION_MODELS` dictionary
-3. Create examples for the model in the agent implementation
-
-### Customizing Agent Behavior
-
-The agents can be customized by:
-- Modifying the prompt templates
-- Adjusting confidence thresholds
-- Adding more examples for few-shot learning
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+Update the `config/full_config.json` file to add or modify extraction models and their fields.

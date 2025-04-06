@@ -1,0 +1,54 @@
+{
+  "Context" : {
+    "FileName": "8204360_Fund Share Price 01 GP3-20250127-365624-395021974.2025.01.27.XLS",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "xls"
+  },
+  "Identifier": [{
+    "Code": "ISIN Code",
+    "CodeType": "Isin",
+    "Currency": "Share currency",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "Fund Name",
+    "CompartmentName": "Sub Fund Name",
+    "InstrumentName": "",
+    "ShareType": "Share Name"
+  },
+  "Valorisation": {
+    "Nav": "NAV Date",
+    "NavDate": "Share Price"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "Sub Fund Currency",
+    "CompartmentAssetValue": "",
+    "ShareAssetValue": "Net asset Value",
+    "Number of Shares": "Number of Shares"
+  },
+  "CorporateAction": [
+    {
+      "Currency": "Dividend Currency",
+      "Type": "Dividend",
+      "Value": "Dividend Value-Date",
+      "ExecutionDate": "Dividend Ex-Date",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "DistributionRate": "Dividend per Share"
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

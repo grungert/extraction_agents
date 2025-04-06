@@ -1,9 +1,9 @@
 """Dynamic model factory for creating Pydantic models from JSON configuration."""
-from typing import Dict, List, Type, Optional, Any, Union, get_type_hints
-from pydantic import BaseModel, Field, create_model
+from typing import Dict, List, Type, Optional, Any
+from pydantic import Field, create_model
 
 from .models import BaseExtraction
-from .config_manager import ConfigurationManager, convert_pascal_to_snake
+from .config_manager import ConfigurationManager
 
 
 def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:

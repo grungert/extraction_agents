@@ -1,0 +1,276 @@
+{
+  "header_detection": {
+    "config": {
+      "max_rows_to_analyze": 15,
+      "confidence_threshold": 0.7
+    },
+    "examples": [
+      {
+        "table": "| Fund name                                  | ISIN code    | Currency   |     NAV |   Number of shares |   Total net assets value | Date                |\n|:-------------------------------------------|:-------------|:-----------|--------:|-------------------:|-------------------------:|:--------------------|\n| Jyske Invest Balanced Strategy (GBP) CL    | DK0060238194 | GBP        | 173.55  |              62414 |              1.08319e+07 | 2025-01-30 00:00:00 |",
+        "json": {
+          "HeaderStartLine": 0,
+          "HeaderEndLine": 0,
+          "ContentStartLine": 2,
+          "ValidationConfidence": 0.95
+        }
+      },
+      {
+        "table": "| ODDO BHF Euro High Yield Bond CI   | LU0115288721   | 940818   |   nan |   nan | EUR   | 36.804              | 36.775              | 0.0008    | 36.783              | 0.0006      | 159247523.58   | 4326929.04         |   nan |   nan | 0   |   nan |   nan | 835941068.04   |\n|:-----------------------------------|:---------------|:---------|------:|------:|:------|:--------------------|:--------------------|:----------|:--------------------|:------------|:---------------|:-------------------|------:|------:|:----|------:|------:|:---------------|\n| Fund Name                          | ISIN Code      | WKN      |   nan |   nan | Curr  | NAV per share       | Prior day           | prior day | Prior Month         | prior month | Total NAV      | Shares Outstanding |   nan |   nan | TIS |   nan |   nan | in base        |\n| nan                                | nan            | nan      |   nan |   nan | nan   | 2025-01-28 00:00:00 | 2025-01-27 00:00:00 | nan       | 2024-12-31 00:00:00 | nan         | nan            | nan                |   nan |   nan | nan |   nan |   nan | currency       |",
+        "json": {
+          "HeaderStartLine": 1,
+          "HeaderEndLine": 2,
+          "ContentStartLine": 3,
+          "ValidationConfidence": 0.95
+        }
+      }
+    ]
+  },
+  "extraction_models": [
+    {
+      "name": "Identifier",
+      "description": "Model for extracting identifier information",
+      "fields": {
+        "Code": {
+          "description": "Header for ISIN Code",
+          "examples": ["ISIN", "CODE ISIN", "ISIN Code"]
+        },
+        "CodeType": {
+          "description": "Type of code, typically 'Isin'",
+          "examples": ["Isin"]
+        },
+        "Currency": {
+          "description": "Header for currency",
+          "examples": ["Currency", "Devise", "Curr"]
+        },
+        "CICCode": {
+          "description": "Header for CIC Code if present",
+          "examples": ["CIC", "CIC Code"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| Fund name                                  | ISIN code    | Currency   |     NAV |   Number of shares |   Total net assets value | Date                |\n|:-------------------------------------------|:-------------|:-----------|--------:|-------------------:|-------------------------:|:--------------------|\n| Jyske Invest Balanced Strategy (GBP) CL    | DK0060238194 | GBP        | 173.55  |              62414 |              1.08319e+07 | 2025-01-30 00:00:00 |\n| Jyske Invest Balanced Strategy USD         | DK0060656197 | USD        | 145.69  |              47670 |              6.94503e+06 | 2025-01-30 00:00:00 |\n| Jyske Invest Stable Strategy USD           | DK0060729259 | USD        | 130.212 |              42006 |              5.46968e+06 | 2025-01-30 00:00:00 |\n| Jyske Invest Stable Strategy GBP           | DK0060729333 | GBP        | 120.234 |              35561 |              4.27565e+06 | 2025-01-30 00:00:00 |\n| Jyske Invest High Yield Corporate Bonds CL | DK0016262728 | EUR        | 242.3   |             223484 |              5.41502e+07 | 2025-01-30 00:00:00 |",
+          "expected": {
+            "Code": "ISIN code",
+            "CodeType": "Isin",
+            "Currency": "Currency",
+            "CICCode": null
+          }
+        },
+        {
+          "table": "| ODDO BHF Euro High Yield Bond CI   | LU0115288721   | 940818   |   nan |   nan | EUR   | 36.804              | 36.775              | 0.0008    | 36.783              | 0.0006      | 159247523.58   | 4326929.04         |   nan |   nan | 0   |   nan |   nan | 835941068.04   |\n|:-----------------------------------|:---------------|:---------|------:|------:|:------|:--------------------|:--------------------|:----------|:--------------------|:------------|:---------------|:-------------------|------:|------:|:----|------:|------:|:---------------|\n| Fund Name                          | ISIN Code      | WKN      |   nan |   nan | Curr  | NAV per share       | Prior day           | prior day | Prior Month         | prior month | Total NAV      | Shares Outstanding |   nan |   nan | TIS |   nan |   nan | in base        |\n| nan                                | nan            | nan      |   nan |   nan | nan   | 2025-01-28 00:00:00 | 2025-01-27 00:00:00 | nan       | 2024-12-31 00:00:00 | nan         | nan            | nan                |   nan |   nan | nan |   nan |   nan | currency       |\n| ODDO BHF Euro High Yield Bond CN   | LU1486847152   | A2DNK1   |   nan |   nan | EUR   | 120.946             | 120.852             | 0.0008    | 120.909             | 0.0003      | 17823362.14    | 147366.15          |   nan |   nan | 0   |   nan |   nan | 835941068.04   |",
+          "expected": {
+            "Code": "ISIN Code",
+            "CodeType": "Isin",
+            "Currency": "Curr",
+            "CICCode": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "Denomination",
+      "description": "Model for extracting denomination information",
+      "fields": {
+        "VehiculeName": {
+          "description": "Header for vehicle name",
+          "examples": ["Vehicle", "Fund"]
+        },
+        "CompartmentName": {
+          "description": "Header for compartment name",
+          "examples": ["Compartment", "Sub-Fund"]
+        },
+        "InstrumentName": {
+          "description": "Header for instrument name",
+          "examples": ["Name", "Fund Name", "FCP"]
+        },
+        "ShareType": {
+          "description": "Header for share type",
+          "examples": ["Share Class", "Class"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| Fund Name | ISIN Code | Currency | NAV |\n| --- | --- | --- | --- |\n| UFF AVENIR SECURITE | FR0007436969 | EUR | 75.42 |\n| UFF AVENIR DIVERSIFIE | FR0007437124 | EUR | 90.64 |",
+          "expected": {
+            "VehiculeName": "UFF",
+            "CompartmentName": null,
+            "InstrumentName": "Fund Name",
+            "ShareType": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "Valorisation",
+      "description": "Model for extracting valorisation information",
+      "fields": {
+        "NAV": {
+          "description": "Header for NAV",
+          "examples": ["NAV", "Valeur Liquidative", "VL"]
+        },
+        "NAVDate": {
+          "description": "Header for NAV date",
+          "examples": ["Date", "NAV Date", "Date de publication"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| Fund Name | ISIN Code | Currency | NAV | Date |\n| --- | --- | --- | --- | --- |\n| UFF AVENIR SECURITE | FR0007436969 | EUR | 75.42 | 2025-01-30 |\n| UFF AVENIR DIVERSIFIE | FR0007437124 | EUR | 90.64 | 2025-01-30 |",
+          "expected": {
+            "NAV": "NAV",
+            "NAVDate": "Date"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MarketCap",
+      "description": "Model for extracting market cap information",
+      "fields": {
+        "ReferenceDate": {
+          "description": "Header for reference date",
+          "examples": ["Date", "Reference Date"]
+        },
+        "CompartmentCurrency": {
+          "description": "Header for compartment currency",
+          "examples": ["Currency", "Compartment Currency"]
+        },
+        "CompartmentAssetValue": {
+          "description": "Header for asset value",
+          "examples": ["Total NAV", "Actif Net", "Total net assets value"]
+        },
+        "ShareAssetValue": {
+          "description": "Header for share asset value",
+          "examples": ["NAV", "Valeur Liquidative"]
+        },
+        "NumberOfShares": {
+          "description": "Header for number of shares",
+          "examples": ["Number of shares", "Nombre de Parts", "Shares Outstanding"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| Fund name                                  | ISIN code    | Currency   |     NAV |   Number of shares |   Total net assets value | Date                |\n|:-------------------------------------------|:-------------|:-----------|--------:|-------------------:|-------------------------:|:--------------------|\n| Jyske Invest Balanced Strategy (GBP) CL    | DK0060238194 | GBP        | 173.55  |              62414 |              1.08319e+07 | 2025-01-30 00:00:00 |",
+          "expected": {
+            "ReferenceDate": "Date",
+            "CompartmentCurrency": "Currency",
+            "CompartmentAssetValue": "Total net assets value",
+            "ShareAssetValue": "NAV",
+            "NumberOfShares": "Number of shares"
+          }
+        }
+      ]
+    },
+    {
+      "name": "CorporateAction",
+      "description": "Model for extracting corporate action information",
+      "fields": {
+        "Currency": {
+          "description": "Header for currency",
+          "examples": ["Currency", "Devise"]
+        },
+        "Type": {
+          "description": "Header for type",
+          "examples": ["Type", "Coupon"]
+        },
+        "Value": {
+          "description": "Header for value",
+          "examples": ["Value", "COUPON"]
+        },
+        "ExecutionDate": {
+          "description": "Header for execution date",
+          "examples": ["Date", "Execution Date", "DATE"]
+        },
+        "PaymentDate": {
+          "description": "Header for payment date",
+          "examples": ["Payment Date"]
+        },
+        "RecordDate": {
+          "description": "Header for record date",
+          "examples": ["Record Date"]
+        },
+        "DistributionRate": {
+          "description": "Header for distribution rate",
+          "examples": ["Distribution Rate"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| CODE ISIN | FCP | DATE | COUPON | CREDIT D'IMPÔT | VL APRES DETACH. |\n| --- | --- | --- | --- | --- | --- |\n| FR0007436969 | UFF AVENIR SECURITE | 1989-12-27 | 5.526277 | 0.030490 | 75.418053 |",
+          "expected": {
+            "Currency": null,
+            "Type": "COUPON",
+            "Value": "COUPON",
+            "ExecutionDate": "DATE",
+            "PaymentDate": null,
+            "RecordDate": null,
+            "DistributionRate": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "Characteristics",
+      "description": "Model for extracting characteristics information",
+      "fields": {
+        "Strategy": {
+          "description": "Header for strategy",
+          "examples": ["Strategy"]
+        },
+        "AssetManager": {
+          "description": "Header for asset manager",
+          "examples": ["Asset Manager", "Manager"]
+        },
+        "PortfolioManager": {
+          "description": "Header for portfolio manager",
+          "examples": ["Portfolio Manager"]
+        },
+        "HostingCountry": {
+          "description": "Header for hosting country",
+          "examples": ["Country", "Hosting Country"]
+        },
+        "LegalStatus": {
+          "description": "Header for legal status",
+          "examples": ["Legal Status", "Status"]
+        },
+        "UnderLegalStatus": {
+          "description": "Header for under legal status",
+          "examples": ["Under Legal Status"]
+        },
+        "InceptionDate": {
+          "description": "Header for inception date",
+          "examples": ["Inception Date", "Launch Date"]
+        },
+        "DistributionPolicy": {
+          "description": "Header for distribution policy",
+          "examples": ["Distribution Policy"]
+        },
+        "PaymentFrequency": {
+          "description": "Header for payment frequency",
+          "examples": ["Payment Frequency"]
+        }
+      },
+      "examples": [
+        {
+          "table": "| Fund | Manager | Country | Strategy | Inception Date |\n| --- | --- | --- | --- | --- |\n| UFF AVENIR SECURITE | UFF Asset Management | France | Balanced | 1989-12-27 |",
+          "expected": {
+            "Strategy": "Strategy",
+            "AssetManager": "Manager",
+            "PortfolioManager": null,
+            "HostingCountry": "Country",
+            "LegalStatus": null,
+            "UnderLegalStatus": null,
+            "InceptionDate": "Inception Date",
+            "DistributionPolicy": null,
+            "PaymentFrequency": null
+          }
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "confidence_threshold": 0.8,
+    "default_example_confidence": 0.9
+  }
+}

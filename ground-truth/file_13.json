@@ -1,0 +1,73 @@
+{
+  "Context" : {
+    "FileName": "8216598_poors.2025.01.30.csv",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "csv"
+  },
+  "Identifier": [
+    {
+      "Code": "ISIN",
+      "CodeType": "Isin",
+      "Currency": "FV-Currency",
+      "CIC Code": ""
+    },
+    {
+      "Code": "WKN",
+      "CodeType": "Wertpapierkennnummer",
+      "Currency": "FV-Currency",
+      "CIC Code": ""
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "Name of the Fund",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "NAV",
+    "NavDate": "Evalution"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "",
+    "ShareAssetValue": "",
+    "Number of Shares": "Number-of-shares-Tranche"
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "Dividend",
+      "Value": "Distribution",
+      "ExecutionDate": "Distribution-Date",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "DistributionRate": ""
+    },
+    {
+      "Currency": "",
+      "Type": "Split",
+      "Value": "Distribution",
+      "ExecutionDate": "Split-date",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "DistributionRate": "",
+      "SplitFactor": "Split-Factor"
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": "",
+    "LiquidationDate": "Liquidation-Date"
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "Context" : {
+    "FileName": "8216825_ABN_AMRO_Funds_Daily_NAV.2025.01.30",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "xls"
+  },
+  "Identifier": [
+    {
+      "Code": "CODE_ISIN",
+      "CodeType": "Isin",
+      "Currency": "CURRENCY",
+      "CIC Code": ""
+    },
+    {
+      "Code": "CODE_WPK",
+      "CodeType": "Wertpapierkennnummer",
+      "Currency": "CURRENCY",
+      "CIC Code": ""
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "NAME",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "NAV_Today",
+    "NavDate": "TRADEDATE"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "TOTAL_NAV",
+    "ShareAssetValue": "",
+    "Number of Shares": "SHARES_OUTSTANDING"
+  },
+  "CorporateAction": [{
+    "Currency": "",
+    "Type": "",
+    "Value": "",
+    "ExecutionDate": "",
+    "PaymentDate": "",
+    "RecordDate": "",
+    "DistributionRate": "Distribution Ratio (%)"
+  }],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}
