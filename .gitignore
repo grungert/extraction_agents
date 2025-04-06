@@ -2,36 +2,8 @@
 Fluxs - AI Training/
 json_outputs/
 ground_truth/
-# Python specific
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+input/
 
-# Results and temporary files
-json_outputs/
-
-# IDE files
-.idea/
-.vscode/
-*.swp
-*.swo
 .DS_Store
 
 # Environment variables
