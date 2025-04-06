@@ -1,7 +1,7 @@
 # Ignore the Fluxs - AI Training folder
 Fluxs - AI Training/
 json_outputs/
-ground_truth/
+ground-truth/
 input/
 
 .DS_Store
