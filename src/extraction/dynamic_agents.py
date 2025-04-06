@@ -51,7 +51,7 @@ class DynamicHeaderValidationAgent:
             # Format the input as a markdown string
             combined_input = f"""
 # Original Table
-{markdown_content[:500]}
+{markdown_content}
 
 # Detected Headers
 ```json
@@ -89,38 +89,15 @@ class DynamicHeaderValidationAgent:
         # Get header validation configuration
         validation_config = self.config_manager.get_validation_config()
         
-        # Create system message
+        # Load system message from prompt file
+        from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": """You are an expert at validating header detection in Excel tables.
-Your task is to validate and correct the detected header positions by comparing them with the original table.
-
-Input Format:
-The input contains two sections:
-1. Original Table: The Excel table in markdown format
-2. Detected Headers: The header positions detected by the header detection agent
-
-Guidelines:
-1. Compare the detected header positions with the original table to verify accuracy
-2. Check if the HeaderStartLine, HeaderEndLine, and ContentStartLine make sense for the table
-3. Use examples as guides for common header patterns
-4. Correct any issues found in the header positions
-5. Provide a confidence score (0.0-1.0) for your validation
-6. Use examples to guide your validation process
-
-Return your validation as a JSON object with these fields:
-- HeaderStartLine: Line where headers start 
-- HeaderEndLine: Line where headers end 
-- ContentStartLine: Line where content starts 
-- ValidationConfidence: Your confidence score (0.0-1.0)
-"""
+            "content": load_prompt("header_validation_system.md")
         }
         
-        # Use examples from configuration manager
-        # For now, we'll use hard-coded examples, but in the future this could be part of the config
-        # Note: The header examples are currently not part of the dynamic configuration
-        from ..examples.header_examples import _get_header_examples
-        header_examples = _get_header_examples()
+        # Load header examples from configuration manager
+        header_examples = self.config_manager.get_header_examples()
         
         # Create examples for the LLM - format them for validation
         examples = []
@@ -129,11 +106,7 @@ Return your validation as a JSON object with these fields:
 # Example {idx}
 # Input Table 
 {example["table"]}
-
-# Output JSON
-```json
-{json.dumps(example["json"], indent=2)}
-```"""
+"""
 
             examples.extend([
                 {"role": "user", "content": validation_input},
@@ -216,35 +189,15 @@ class DynamicHeaderDetectionAgent:
         # Get header detection configuration
         header_config = self.config_manager.get_header_detection_config()
         
-        # Create system message
+        # Load system message from prompt file
+        from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": """You are an expert at analyzing Excel tables converted to markdown format.
-Your task is to identify the header rows and content rows in the table.
-
-Guidelines:
-1. Analyze the first 15 rows of the table to identify patterns
-2. Use examples as guides for common header patterns
-3. Determine where the header starts and ends
-4. Determine where the actual content starts
-5. Provide a confidence score (0.0-1.0) for your detection
-6. Headers often have different formatting or contain column titles
-7. Content rows typically contain actual data values
-8. Use examples to guide your detection process
-
-Return your analysis as a JSON object with these fields:
-- HeaderStartLine: Line where headers start
-- HeaderEndLine: Line where headers end 
-- ContentStartLine: Line where content starts 
-- ValidationConfidence: Your confidence score (0.0-1.0)
-"""
+            "content": load_prompt("header_detection_system.md")
         }
         
-        # Use examples from configuration manager
-        # For now, we'll use hard-coded examples, but in the future this could be part of the config
-        # Note: The header examples are currently not part of the dynamic configuration
-        from ..examples.header_examples import _get_header_examples
-        header_examples = _get_header_examples()
+        # Load header examples from configuration manager
+        header_examples = self.config_manager.get_header_examples()
         
         # Create examples for the LLM - format them for validation
         examples = []
@@ -253,11 +206,7 @@ Return your analysis as a JSON object with these fields:
 # Example {idx}
 # Input Table              
 {example["table"]}
-
-# Output JSON
-```json
-{json.dumps(example["json"], indent=2)}
-```"""
+"""
 
             examples.extend([
                 {"role": "user", "content": validation_input},
@@ -408,24 +357,11 @@ class DynamicExtractionAgent:
         Returns:
             List of message dictionaries for the LLM
         """
-        # Create system message based on section
+        # Load system message template from prompt file
+        from ..utils.prompt_utils import load_template_prompt
         system_message = {
             "role": "system",
-            "content": f"""You are an expert at extracting {section_name} information from Excel tables.
-Your task is to identify the column headers that correspond to {section_name} fields.
-
-Guidelines:
-1. Analyze the table structure to identify relevant columns
-2. Match column headers to the corresponding fields in the {section_name} section
-3. Return only the headers, not the actual data values
-4. If a field is not present in the table, return null for that field
-5. Provide a confidence score (0.0-1.0) for your extraction
-6. Use examples to guide your extraction process
-
-Return your extraction as a JSON object with these fields:
-- All the fields from the {section_name} model
-- ValidationConfidence: Your confidence score (0.0-1.0)
-"""
+            "content": load_template_prompt("section_extraction_system_template.md", section_name=section_name)
         }
         
         # Format examples for extraction using the dynamic examples manager
@@ -445,7 +381,7 @@ class DynamicValidationAgent:
         """
         self.llm = llm
         self.config_manager = config_manager or get_configuration_manager()
-        self.messages = self._create_validation_messages()
+        self.section_messages = {}  # Initialize empty dictionary for section-specific messages
         
     def validate(self, extracted_data: BaseExtraction, markdown_content: str, header_info: ContextModel,
                 section_name: str, model_class: Type[BaseExtraction]) -> Optional[Any]:
@@ -489,12 +425,16 @@ class DynamicValidationAgent:
             # Create validation model class that extends the original
             validation_model = self._create_validation_model(model_class)
             
-            # Validate data
+            # Get or create example messages for this section
+            if section_name not in self.section_messages:
+                self.section_messages[section_name] = self._create_section_validation_messages(section_name)
+            
+            # Validate data using section-specific messages
             result = extract_section(
                 markdown_content=json_input,
                 section_name=f"{section_name}Validation",
                 model_class=validation_model,
-                messages=self.messages,
+                messages=self.section_messages[section_name],
                 llm=self.llm
             )
             
@@ -552,45 +492,26 @@ class DynamicValidationAgent:
             
         return CombinedValidationModel
         
-    def _create_validation_messages(self) -> List[Dict]:
+    def _create_section_validation_messages(self, section_name: str) -> List[Dict]:
         """
-        Create example messages for validation.
+        Create example messages for validation of a specific section.
         
+        Args:
+            section_name: Name of the section
+            
         Returns:
             List of message dictionaries for the LLM
         """
-        # Get validation configuration
-        validation_config = self.config_manager.get_validation_config()
-        confidence_threshold = validation_config.get('confidence_threshold', 0.8)
-        
-        # Create system message
+        # Load system message template from prompt file
+        from ..utils.prompt_utils import load_template_prompt
         system_message = {
             "role": "system",
-            "content": """You are an expert at validating extracted data from Excel tables.
-Your task is to validate and correct the extracted data by comparing it with the original table.
-
-Input Format:
-The input contains two sections:
-1. Original Table: The Excel table in markdown format
-2. Extracted Data: The data extracted from the table in JSON format
-
-Guidelines:
-1. Compare the extracted data with the original table to verify accuracy
-2. Check if all relevant fields have been correctly identified
-3. Correct any issues found (e.g., wrong mappings, formatting, capitalization, etc.)
-4. Provide a confidence score (0.0-1.0) for your validation
-5. List any corrections you made
-6. Use examples to guide your validation process
-
-Return your validation as a JSON object with these fields:
-- ValidatedData: The corrected data
-- ValidationConfidence: Your confidence score (0.0-1.0)
-- CorrectionsMade: List of corrections you made
-"""
+            "content": load_template_prompt("section_validation_system_template.md", section_name=section_name)
         }
         
         # Format examples for validation using the dynamic examples manager
-        return format_validation_messages(self.config_manager, system_message)
+        # Pass the section_name to get only examples for this specific section
+        return format_validation_messages(self.config_manager, system_message, section_name)
 
 
 class DynamicAgentPipelineCoordinator:
@@ -692,7 +613,7 @@ class DynamicAgentPipelineCoordinator:
         results = {}  # Temporary dictionary for extraction results
         for section_name, model_class in self.extraction_models.items():
             # Initialize section results
-            results[section_name] = {k: None for k in model_class().model_fields.keys()}
+            results[section_name] = {k: None for k in model_class.model_fields.keys()}
             
             # Extract data
             extracted_data = self.extraction_agent.extract_data(

@@ -1,0 +1,52 @@
+{
+  "Context" : {
+    "FileName": "8216093_NATIXIS_IF 0129.2025.01.30.xls",
+    "HeaderStartLine": "",
+    "HeaderEndLine": "",
+    "ContentStartLine": "",
+    "FileType": "xls"
+  },
+  "Identifier": [{
+    "Code": "ISIN",
+    "CodeType": "Isin",
+    "Currency": "CURRENCY",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "COMPARTMENT",
+    "InstrumentName": "Natixis International Funds (Dublin) I plc.",
+    "ShareType": "CLASS"
+  },
+  "Valorisation": {
+    "Nav": "NAV",
+    "NavDate": "DATE"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "Total NAV",
+    "ShareAssetValue": "",
+    "Number of Shares": "Number of shares"
+  },
+  "CorporateAction": [{
+    "Currency": "",
+    "Type": "",
+    "Value": "",
+    "ExecutionDate": "Distribution start date",
+    "PaymentDate": "Distribution end date",
+    "RecordDate": "",
+    "DistributionRate": "Distribution ratio"
+  }],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

@@ -1,9 +1,8 @@
 """Dynamic example management for LLM extraction agents."""
 import json
-from typing import Dict, List, Any, Optional, Type, Union
+from typing import Dict, List, Any, Optional
 
-from ..config_manager import ConfigurationManager, convert_pascal_to_snake
-from ..models import BaseExtraction
+from ..config_manager import ConfigurationManager
 
 
 def get_extraction_examples_from_config(
@@ -28,9 +27,9 @@ def get_extraction_examples_from_config(
         # Use PascalCase keys directly from expected fields
         expected = example.get("expected", {}).copy()
         
-        # Add validation confidence if not present
+        # Add validation confidence if not present, using the config-defined default
         if "ValidationConfidence" not in expected:
-            expected["ValidationConfidence"] = 0.9
+            expected["ValidationConfidence"] = config_manager.get_default_example_confidence()
         
         examples.append({
             "table": example.get("table", ""),
@@ -40,12 +39,13 @@ def get_extraction_examples_from_config(
     return examples
 
 
-def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
+def create_validation_example(example: Dict[str, Any], config_manager: Optional[ConfigurationManager] = None) -> Dict[str, Any]:
     """
     Create a validation example from an extraction example.
     
     Args:
         example: The extraction example
+        config_manager: Optional configuration manager to get default confidence
         
     Returns:
         A validation example with modified data
@@ -72,10 +72,15 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
     # Create the validation input
     validation_example["modified_json"] = modified_json
     
+    # Get default confidence value from config or fallback to 0.9
+    default_confidence = 0.9
+    if config_manager:
+        default_confidence = config_manager.get_default_example_confidence()
+    
     # Create the expected validation output
     validation_example["validation_output"] = {
         "ValidatedData": example["json"],
-        "ValidationConfidence": example["json"].get("ValidationConfidence", 0.9),
+        "ValidationConfidence": example["json"].get("ValidationConfidence", default_confidence),
         "CorrectionsMade": ["Corrected data based on table context"]
     }
     
@@ -83,7 +88,8 @@ def create_validation_example(example: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def format_messages(examples: List[Dict[str, Any]], system_message: Dict[str, str], 
-                   message_type: str = "extraction") -> List[Dict[str, str]]:
+                   message_type: str = "extraction", 
+                   config_manager: Optional[ConfigurationManager] = None) -> List[Dict[str, str]]:
     """
     Format examples for LLM agents.
     
@@ -91,6 +97,7 @@ def format_messages(examples: List[Dict[str, Any]], system_message: Dict[str, st
         examples: List of examples
         system_message: System message for the LLM
         message_type: Type of formatting to apply ("extraction" or "validation")
+        config_manager: Optional configuration manager to get default confidence
         
     Returns:
         List of formatted messages for the LLM
@@ -108,17 +115,13 @@ def format_messages(examples: List[Dict[str, Any]], system_message: Dict[str, st
             
         elif message_type == "validation":
             # Create a validation example from the extraction example
-            validation_example = create_validation_example(example)
+            validation_example = create_validation_example(example, config_manager)
             
             input_content = f"""
 # Example {idx}
 # Original Table
 {example["table"]}
-
-# Extracted Data
-```json
-{json.dumps(validation_example["modified_json"], indent=2)}
-```"""
+"""
             output_content = json.dumps(validation_example["validation_output"])
             
         else:
@@ -154,7 +157,8 @@ def format_extraction_messages(
 
 def format_validation_messages(
     config_manager: ConfigurationManager,
-    system_message: Dict[str, str]
+    system_message: Dict[str, str],
+    model_name: str = None
 ) -> List[Dict[str, str]]:
     """
     Format examples for validation agent.
@@ -162,15 +166,20 @@ def format_validation_messages(
     Args:
         config_manager: Configuration manager instance
         system_message: System message for the LLM
+        model_name: Name of the model to get examples for. If None, uses examples from all models.
         
     Returns:
         List of formatted messages for the LLM
     """
-    # Get examples for all models
-    all_examples = []
-    for model_def in config_manager.get_extraction_models():
-        model_name = model_def.get("name")
+    if model_name:
+        # Get examples only for the specified model
         examples = get_extraction_examples_from_config(config_manager, model_name)
-        all_examples.extend(examples)
+    else:
+        # Get examples for all models (backward compatibility)
+        examples = []
+        for model_def in config_manager.get_extraction_models():
+            model_name = model_def.get("name")
+            model_examples = get_extraction_examples_from_config(config_manager, model_name)
+            examples.extend(model_examples)
     
-    return format_messages(all_examples, system_message, "validation")
+    return format_messages(examples, system_message, "validation", config_manager)

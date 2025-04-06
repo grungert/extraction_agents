@@ -1,0 +1,56 @@
+{
+  "Context" : {
+    "FileName": "8217202_VL Keren Finance.2025.01.30.xlsx",
+    "HeaderStartLine": 8,
+    "HeaderEndLine": 9,
+    "ContentStartLine": 10,
+    "FileType": "xlsx"
+  },
+  "Identifier": [
+    {
+      "Code": "Code ISIN",
+      "CodeType": "Isin",
+      "Currency": "[€]",
+      "CIC Code": ""
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "FONDS",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "NAV",
+    "NavDate": "[1/29/2025]"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "",
+    "ShareAssetValue": "",
+    "Number of Shares": ""
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "",
+      "Value": "",
+      "ExecutionDate": "",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "DistributionRate": ""
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

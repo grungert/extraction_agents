@@ -1,0 +1,52 @@
+{
+  "Context" : {
+    "FileName": "8215632_Daily Prices as of 2025 01 29.2025.01.30.xls",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "xls"
+  },
+  "Identifier": [{
+    "Code": "ISIN CODE",
+    "CodeType": "Isin",
+    "Currency": "CURRENCY",
+    "CIC Code": ""
+  }],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "FUND NAME",
+    "ShareType": "SHARE CLASSE"
+  },
+  "Valorisation": {
+    "Nav": "NAV PRICE",
+    "NavDate": "NAV DATE"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "TNA VALUE",
+    "ShareAssetValue": "",
+    "Number of Shares": "UNITS OUTSTANDING"
+  },
+  "CorporateAction": [{
+    "Currency": "",
+    "Type": "",
+    "Value": "",
+    "ExecutionDate": "",
+    "PaymentDate": "",
+    "RecordDate": "",
+    "DistributionRate": ""
+  }],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

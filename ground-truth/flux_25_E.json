@@ -1,0 +1,62 @@
+{
+  "Context" : {
+    "FileName": "8219171_Lancaster_OEIC_20250130_2230_1130_20250130110224.2025.01.31.csv",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "csv"
+  },
+  "Identifier": [
+    {
+      "Code": "ISIN",
+      "CodeType": "Isin",
+      "Currency": "",
+      "CIC Code": ""
+    },
+    {
+      "Code": "Sedol",
+      "CodeType": "Sedol",
+      "Currency": "",
+      "CIC Code": ""
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "Fund Name",
+    "InstrumentName": "Share Class Name",
+    "ShareType": "Currency"
+  },
+  "Valorisation": {
+    "Nav": "Unrounded NAV Price",
+    "NavDate": "Price Date"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "Base CCY Share Class NAV",
+    "ShareAssetValue": "",
+    "Number of Shares": "Share Class Units In Issue"
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "",
+      "Value": "",
+      "ExecutionDate": "",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "Percentage": ""
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}

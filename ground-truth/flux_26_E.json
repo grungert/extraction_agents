@@ -1,0 +1,56 @@
+{
+  "Context" : {
+    "FileName": "8217596_30012025_PRICE_EMAIL_NURS.2025.01.30.XLS",
+    "HeaderStartLine": 1,
+    "HeaderEndLine": 1,
+    "ContentStartLine": 2,
+    "FileType": "xls"
+  },
+  "Identifier": [
+    {
+    "Code": "SEDOL",
+    "CodeType": "Sedol",
+    "Currency": "CURRENCY",
+    "CIC Code": ""
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": "",
+    "CompartmentName": "",
+    "InstrumentName": "",
+    "ShareType": ""
+  },
+  "Valorisation": {
+    "Nav": "QUOTED PRICE",
+    "NavDate": "PRICE DATE"
+  },
+  "MarketCap": {
+    "ReferenceDate": "",
+    "CompartmentCurrency": "",
+    "CompartmentAssetValue": "FUND NAME",
+    "ShareAssetValue": "",
+    "Number of Shares": ""
+  },
+  "CorporateAction": [
+    {
+      "Currency": "",
+      "Type": "",
+      "Value": "",
+      "ExecutionDate": "",
+      "PaymentDate": "",
+      "RecordDate": "",
+      "Percentage": ""
+    }
+  ],
+  "Characteristics": {
+    "Strategy": "",
+    "AssetManager": "",
+    "PortfolioManager": "",
+    "HostingCountry": "",
+    "LegalStatus": "",
+    "UnderLegalStatus": "",
+    "InceptionDate": "",
+    "DistributionPolicy": "",
+    "PaymentFrequency": ""
+  }
+}
