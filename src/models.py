@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 # Configuration models
 class ModelConfig(BaseModel):
     """Configuration for the LLM model."""
-    model_name: str = "gemma-3-12b-it"
+    model_name: str = "llama-3.2-3b-instruct"
     base_url: str = "http://localhost:1234/v1"
     api_key: str = "null"
     temperature: float = 0.3
@@ -44,7 +44,7 @@ class ContextModel(BaseExtraction):
 # Identifier section - primary model for LLM extraction
 class IdentifierModel(BaseExtraction):
     """Model for extracting identifier information."""
-    code: Optional[str] = Field(None, description="Header for ISIN Code. Examples: CODE ISIN, Code ISIN, ISIN")
+    code: Optional[str] = Field(None, description="Header for ISIN Code. Examples: CODE ISIN, Code ISIN, ISIN, Account")
     code_type: Optional[str] = Field(None, description="Type of code, typically 'Isin'")
     currency: Optional[str] = Field(None, description="Header for currency. Examples: Devise, Currency")
     cic_code: Optional[str] = Field(None, description="Header for CIC Code if present")
@@ -52,7 +52,7 @@ class IdentifierModel(BaseExtraction):
 # Denomination section
 class DenominationModel(BaseExtraction):
     """Model for extracting denomination information."""
-    vehicule_name: Optional[str] = Field(None, description="Header for vehicle name")
+    vehicule_name: Optional[str] = Field(None, description="Header for vehicle name. Examples: Umbrella name")
     compartment_name: Optional[str] = Field(None, description="Header for compartment name")
     instrument_name: Optional[str] = Field(None, description="Header for instrument name. Examples: FCP")
     share_type: Optional[str] = Field(None, description="Header for share type")
@@ -60,8 +60,8 @@ class DenominationModel(BaseExtraction):
 # Valorisation section
 class ValorisationModel(BaseExtraction):
     """Model for extracting valorisation information."""
-    nav: Optional[str] = Field(None, description="Header for NAV. Examples: Valeur Liquidative, VL")
-    nav_date: Optional[str] = Field(None, description="Header for NAV date. Example: Date de publication")
+    nav: Optional[str] = Field(None, description="Header for NAV. Examples: Valeur Liquidative, VL, NAV/share, NAV per share")
+    nav_date: Optional[str] = Field(None, description="Header for NAV date. Example: Date de publication, Valuation Date")
 
 # MarketCap section
 class MarketCapModel(BaseExtraction):
