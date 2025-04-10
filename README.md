@@ -81,6 +81,7 @@ curl -X POST "http://localhost:8000/extract" \
     * *Problem:* Data extraction is currently performed separately for each data group. Consequently, the same header information can appear in multiple extracted groups.
     * *Task:* Define a method to handle this redundancy (e.g., consolidate, deduplicate) after the initial extraction phase.
 
+
 * **Add information about type of extraction**
 
 It can be:
@@ -107,9 +108,7 @@ flowchart TD
 
     Extract --> Validate[ValidationAgent]
 
-    Validate -->|Confidence ≥ 0.8| Output[JSON Output]
-    Validate -->|Confidence < 0.8| UseOriginal[Use Original Extraction]
-    UseOriginal --> Output
+    Validate --> Output[JSON Output]
 
     subgraph "Integration with Existing Code"
         HeaderDetect -.-> Process[processing.py]

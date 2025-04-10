@@ -24,7 +24,7 @@ def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:
         description = field_def.get("description", "")
         examples = field_def.get("examples", [])
         if examples:
-            description += f". Possible headers: {', '.join(examples)}"
+            description += f". Possible headers values: {', '.join(examples)}"
         
         type_str = field_def.get("type", "string").lower()
 

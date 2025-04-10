@@ -638,41 +638,36 @@ class DynamicAgentPipelineCoordinator:
                 model_class
             )
             
-            # Check validation confidence
-            if (validated_result and 
-                hasattr(validated_result, 'ValidationConfidence') and 
-                validated_result.ValidationConfidence >= extraction_confidence_threshold and
-                hasattr(validated_result, 'ValidatedData')):
-                
-                # Update results with validated data
+            # Always use validation output if available, regardless of confidence
+            if validated_result and hasattr(validated_result, 'ValidatedData'):
                 ValidatedData = validated_result.ValidatedData.model_dump()
                 for field, value in ValidatedData.items():
                     if value is not None:
                         results[section_name][field] = value
-                
+
                 # Add validation confidence to results
-                results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
-                        
-                console.print(f"[green]✓[/green] Validated {section_name} with confidence {validated_result.ValidationConfidence:.2f}")
-                
+                if hasattr(validated_result, 'ValidationConfidence'):
+                    results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
+                else:
+                    results[section_name]['ValidationConfidence'] = 0.9  # Default if missing
+
+                console.print(f"[green]✓[/green] Used validated {section_name} (confidence {results[section_name]['ValidationConfidence']:.2f})")
+
                 # Log corrections if any
                 if hasattr(validated_result, 'CorrectionsMade') and validated_result.CorrectionsMade:
                     console.print(f"[blue]Corrections made:[/blue]")
                     for correction in validated_result.CorrectionsMade:
                         console.print(f"  • {correction}")
             else:
-                # Use original extraction if validation fails
-                console.print(f"[yellow]⚠[/yellow] Low validation confidence for {section_name}, using original extraction")
+                # Use original extraction only if validation completely failed
+                console.print(f"[yellow]⚠[/yellow] Validation failed for {section_name}, using original extraction")
                 result_data = extracted_data.model_dump()
                 for field, value in result_data.items():
                     if value is not None:
                         results[section_name][field] = value
-                
-                # Add a lower validation confidence
-                if validated_result and hasattr(validated_result, 'ValidationConfidence'):
-                    results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
-                else:
-                    results[section_name]['ValidationConfidence'] = 0.5  # Default medium confidence
+
+                # Add a default confidence
+                results[section_name]['ValidationConfidence'] = 0.5
         
         # Add extraction results to ordered results
         for section_name, section_data in results.items():

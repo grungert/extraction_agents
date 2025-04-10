@@ -1,0 +1,176 @@
+{
+  "Context": {
+    "FileName": [
+      "8218078_AB_Funds_NAV.2025.01.31.csv",
+      "8204360_Fund Share Price 01 GP3-20250127-365624-395021974.2025.01.27.XLS",
+      "8217501_QuoteMed.2025.01.30.xls",
+      "8215632_Daily Prices as of 2025 01 29.2025.01.30.xls",
+      "8219171_Lancaster_OEIC_20250130_2230_1130_20250130110224.2025.01.31.csv",
+      "8214950_NAV_20250128.2025.01.30.xls",
+      "8216603_ReutersContribution 2025-01-30.2025.01.30.xlsx",
+      "8217202_VL Keren Finance.2025.01.30.xlsx",
+      "8217465_VL_SycomoreAM.2025.01.30.xls",
+      "8176522_ECNAV.2025.01.15.csv",
+      "8217081_FIDOEIC7.2025.01.30.CSV",
+      "8216095_REP JII NAV_2025-01-30.2025.01.30.xls",
+      "8217734_Export_Last_NAV.2025.01.30.csv",
+      "8216093_NATIXIS_IF 0129.2025.01.30.xls",
+      "8169693_LFP_VL.2025.01.13.csv",
+      "8217076_MGF Midday Prices.2025.01.30.xls",
+      "8216598_poors.2025.01.30.csv",
+      "8216527_PGOS_Dublin_NAV_20250130.2025.01.30.csv",
+      "8217596_30012025_PRICE_EMAIL_NURS.2025.01.30.XLS",
+      "8206743_Diffusion VL externe.2025.01.27.xlsx",
+      "8216825_ABN_AMRO_Funds_Daily_NAV.2025.01.30",
+      "8217427_ccram_nav.2025.01.30.csv",
+      "8208700_PIMCO Global Investor Series PLC Re Investment Notice January 2025.2025.01.28.xlsx",
+      "8206743_COUPONS pour externe.2025.01.27.xls",
+      "8216785_Classeur1.2025.01.30.xlsx"
+    ],
+    "HeaderStartLine": [
+      6,
+      1,
+      2,
+      9,
+      8,
+      16,
+      0,
+      11,
+      3
+    ],
+    "HeaderEndLine": [
+      7,
+      1,
+      4,
+      11,
+      2,
+      9,
+      17,
+      0,
+      10,
+      12,
+      3
+    ],
+    "ContentStartLine": [
+      9,
+      2,
+      5,
+      12,
+      3,
+      10,
+      23,
+      1,
+      11,
+      13,
+      4
+    ],
+    "FileType": ["csv", "xls", "xlsx"]
+  },
+  "Identifier": [
+    {
+      "Code": [
+        "USD.ISIN",
+        "ISIN Code",
+        "CodIsin",
+        "ISIN CODE",
+        "ISIN",
+        "Sedol",
+        "Instrument Identifier/ISIN code",
+        "WKN",
+        "Code ISIN",
+        "SEDOL",
+        "ISIN code",
+        "Column2",
+        "BloombergTicker",
+        "VN",
+        "FMSedols",
+        "ISESedols",
+        "EuroClearCedel",
+        "Bundesamt",
+        "AFCCodes",
+        "CODE_ISIN",
+        "CODE_WPK",
+        "CODE ISIN",
+        "Isin Code"
+      ],
+      "CodeType": ["Isin", "Sedol", "Wertpapierkennnummer", "Bloomberg", "Valorennummer", "Euroclear", "AssociationFrançaisedesCreditsCodes"],
+      "Currency": ["Share currency", "Divisa", "CURRENCY", "Curr", "Currency", "[€]", "Devise", "Column7", "PRICE CCY", "FV-Currency", "BASECurrency", "Dev", "Denomination", "[EUR]", "devise"],
+      "CIC Code": []
+    },
+    {
+      "Code": [
+        "Code ISIN"
+      ],
+      "CodeType": [
+        "Isin"
+      ],
+      "Currency": [
+        "Devise"
+      ],
+      "CIC Code": []
+    }
+  ],
+  "Denomination": {
+    "VehiculeName": ["Fund Name", "Umbrella_Name"],
+    "CompartmentName": ["Sub Fund Name", "Fund Name", "COMPARTMENT", "TITLE"],
+    "InstrumentName": ["Fund Name and Class", "Descrizione", "FUND NAME", "Share Class Name", "Fund Name", "DISPLAY_NAME", "FONDS", "Libellé", "Name", "Fund name", "Column1", "Natixis International Funds (Dublin) I plc.", "Name of the Fund", "Fund_Name", "FCP", "NAME", "LibellÃ© Portefeuille", "Nom"],
+    "ShareType": ["Share Name", "SHARE CLASSE", "Currency", "CLASS", "TITLE", "Fund_Class"]
+  },
+  "Valorisation": {
+    "Nav": ["USD.Price", "NAV Date", "Quota", "NAV PRICE", "Unrounded NAV Price", "NAV per share", "NAV", "VL", "Price", "Column4", "PRICE", "NAV_per_unit", "QUOTED PRICE", "Valeur Liquidative", "NAV_Today", "Re-Invest Net Asset Value Per Share", "vl"],
+    "NavDate": ["[30/01/25]", "Share Price", "Data Competenza:", "NAV DATE", "Price Date", "[1/28/2025]", "Datum", "[1/29/2025]", "Date", "Column3", "DATE", "Date VL", "VAL DATE", "Evalution", "Valuation_Date", "PRICE DATE", "Date de publication", "TRADEDATE", "Payable Date", "date"]
+  },
+  "MarketCap": {
+    "ReferenceDate": ["Price Date", "Date VL"],
+    "CompartmentCurrency": ["Sub Fund Currency", "Total_NAV_per_Class_Base_Ccy"],
+    "CompartmentAssetValue": ["TNA VALUE", "Base CCY Share Class NAV", "Total NAV", "Actif Part", "Total net assets value", "Column6", "Encours_Global", "TOTAL NAV 淨資產值", "Total_Net_Assets_per_Class_MIL", "FUND NAME", "Actif Net", "TOTAL_NAV", "actif"],
+    "ShareAssetValue": ["Net asset Value", "Nb Parts", "Encours Net"],
+    "Number of Shares": ["Number of Shares", "UNITS OUTSTANDING", "Share Class Units In Issue", "Shares Outstanding", "Shares outstanding per shareclass", "Number of shares", "Column5", "Nb Parts", "UNITS IN ISSUE", "Number-of-shares-Tranche", "Units_In_Issue", "Nombre de Parts", "SHARES_OUTSTANDING", "parts"]
+  },
+  "CorporateAction": [
+    {
+      "Currency": ["Dividend Currency", "Currency", "Devise", "EUR"],
+      "Type": ["Dividend", "Coupon", "Split"],
+      "Value": ["Dividend Value-Date", "COUPON", "Div Value", "Price Date", "Distribution"],
+      "ExecutionDate": ["Dividend Ex-Date", "DATE", "Ex Div Date", "Distribution start date", "Date VL", "Distribution-Date", "Split-date", "Ex Date"],
+      "PaymentDate": ["Div Pay Date", "Distribution end date", "Payable Date"],
+      "RecordDate": [
+        "Record Date"
+      ],
+      "Percentage": [],
+      "DistributionRate": ["Dividend per Share", "Distribution ratio", "Distribution Ratio (%)", "Per Share Rate"],
+      "SplitFactor": [
+        "Split-Factor"
+      ]
+    },
+    {
+      "Currency": [],
+      "Type": [
+        "Coupon"
+      ],
+      "Value": [
+        "COUPON"
+      ],
+      "ExecutionDate": [
+        "DATE"
+      ],
+      "PaymentDate": [],
+      "RecordDate": [],
+      "DistributionRate": []
+    }
+  ],
+  "Characteristics": {
+    "Strategy": [],
+    "AssetManager": [],
+    "PortfolioManager": [],
+    "HostingCountry": [],
+    "LegalStatus": [],
+    "UnderLegalStatus": [],
+    "InceptionDate": [],
+    "DistributionPolicy": [],
+    "PaymentFrequency": [],
+    "LiquidationDate": [
+      "Liquidation-Date"
+    ]
+  }
+}
