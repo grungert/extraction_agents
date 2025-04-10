@@ -32,19 +32,23 @@
       "fields": {
         "Code": {
           "description": "Header for ISIN Code",
-          "examples": ["ISIN", "CODE ISIN", "ISIN Code"]
+          "examples": ["ISIN", "CODE ISIN", "ISIN Code"],
+          "type": "string"
         },
         "CodeType": {
           "description": "Type of code, typically 'Isin'",
-          "examples": ["Isin"]
+          "examples": ["Isin"],
+          "type": "string"
         },
         "Currency": {
           "description": "Header for currency",
-          "examples": ["Currency", "Devise", "Curr"]
+          "examples": ["Currency", "Devise", "Curr"],
+          "type": "string"
         },
         "CICCode": {
           "description": "Header for CIC Code if present",
-          "examples": ["CIC", "CIC Code"]
+          "examples": ["CIC", "CIC Code"],
+          "type": "string"
         }
       },
       "examples": [
@@ -74,19 +78,23 @@
       "fields": {
         "VehiculeName": {
           "description": "Header for vehicle name",
-          "examples": ["Vehicle", "Fund"]
+          "examples": ["Vehicle", "Fund"],
+          "type": "string"
         },
         "CompartmentName": {
           "description": "Header for compartment name",
-          "examples": ["Compartment", "Sub-Fund"]
+          "examples": ["Compartment", "Sub-Fund"],
+          "type": "string"
         },
         "InstrumentName": {
           "description": "Header for instrument name",
-          "examples": ["Name", "Fund Name", "FCP"]
+          "examples": ["Name", "Fund Name", "FCP"],
+          "type": "string"
         },
         "ShareType": {
           "description": "Header for share type",
-          "examples": ["Share Class", "Class"]
+          "examples": ["Share Class", "Class"],
+          "type": "string"
         }
       },
       "examples": [
@@ -107,11 +115,13 @@
       "fields": {
         "NAV": {
           "description": "Header for NAV",
-          "examples": ["NAV", "Valeur Liquidative", "VL"]
+          "examples": ["NAV", "Valeur Liquidative", "VL"],
+          "type": "string"
         },
         "NAVDate": {
           "description": "Header for NAV date",
-          "examples": ["Date", "NAV Date", "Date de publication"]
+          "examples": ["Date", "NAV Date", "Date de publication"],
+          "type": "string"
         }
       },
       "examples": [
@@ -130,23 +140,28 @@
       "fields": {
         "ReferenceDate": {
           "description": "Header for reference date",
-          "examples": ["Date", "Reference Date"]
+          "examples": ["Date", "Reference Date"],
+          "type": "string"
         },
         "CompartmentCurrency": {
           "description": "Header for compartment currency",
-          "examples": ["Currency", "Compartment Currency"]
+          "examples": ["Currency", "Compartment Currency"],
+          "type": "string"
         },
         "CompartmentAssetValue": {
           "description": "Header for asset value",
-          "examples": ["Total NAV", "Actif Net", "Total net assets value"]
+          "examples": ["Total NAV", "Actif Net", "Total net assets value"],
+          "type": "string"
         },
         "ShareAssetValue": {
           "description": "Header for share asset value",
-          "examples": ["NAV", "Valeur Liquidative"]
+          "examples": ["NAV", "Valeur Liquidative"],
+          "type": "string"
         },
         "NumberOfShares": {
           "description": "Header for number of shares",
-          "examples": ["Number of shares", "Nombre de Parts", "Shares Outstanding"]
+          "examples": ["Number of shares", "Nombre de Parts", "Shares Outstanding"],
+          "type": "string"
         }
       },
       "examples": [
@@ -168,31 +183,38 @@
       "fields": {
         "Currency": {
           "description": "Header for currency",
-          "examples": ["Currency", "Devise"]
+          "examples": ["Currency", "Devise"],
+          "type": "string"
         },
         "Type": {
           "description": "Header for type",
-          "examples": ["Type", "Coupon"]
+          "examples": ["Type", "Coupon"],
+          "type": "string"
         },
         "Value": {
           "description": "Header for value",
-          "examples": ["Value", "COUPON"]
+          "examples": ["Value", "COUPON"],
+          "type": "string"
         },
         "ExecutionDate": {
           "description": "Header for execution date",
-          "examples": ["Date", "Execution Date", "DATE"]
+          "examples": ["Date", "Execution Date", "DATE"],
+          "type": "string"
         },
         "PaymentDate": {
           "description": "Header for payment date",
-          "examples": ["Payment Date"]
+          "examples": ["Payment Date"],
+          "type": "string"
         },
         "RecordDate": {
           "description": "Header for record date",
-          "examples": ["Record Date"]
+          "examples": ["Record Date"],
+          "type": "string"
         },
         "DistributionRate": {
           "description": "Header for distribution rate",
-          "examples": ["Distribution Rate"]
+          "examples": ["Distribution Rate"],
+          "type": "string"
         }
       },
       "examples": [
@@ -216,39 +238,48 @@
       "fields": {
         "Strategy": {
           "description": "Header for strategy",
-          "examples": ["Strategy"]
+          "examples": ["Strategy"],
+          "type": "string"
         },
         "AssetManager": {
           "description": "Header for asset manager",
-          "examples": ["Asset Manager", "Manager"]
+          "examples": ["Asset Manager", "Manager"],
+          "type": "string"
         },
         "PortfolioManager": {
           "description": "Header for portfolio manager",
-          "examples": ["Portfolio Manager"]
+          "examples": ["Portfolio Manager"],
+          "type": "string"
         },
         "HostingCountry": {
           "description": "Header for hosting country",
-          "examples": ["Country", "Hosting Country"]
+          "examples": ["Country", "Hosting Country"],
+          "type": "string"
         },
         "LegalStatus": {
           "description": "Header for legal status",
-          "examples": ["Legal Status", "Status"]
+          "examples": ["Legal Status", "Status"],
+          "type": "string"
         },
         "UnderLegalStatus": {
           "description": "Header for under legal status",
-          "examples": ["Under Legal Status"]
+          "examples": ["Under Legal Status"],
+          "type": "string"
         },
         "InceptionDate": {
           "description": "Header for inception date",
-          "examples": ["Inception Date", "Launch Date"]
+          "examples": ["Inception Date", "Launch Date"],
+          "type": "string"
         },
         "DistributionPolicy": {
           "description": "Header for distribution policy",
-          "examples": ["Distribution Policy"]
+          "examples": ["Distribution Policy"],
+          "type": "string"
         },
         "PaymentFrequency": {
           "description": "Header for payment frequency",
-          "examples": ["Payment Frequency"]
+          "examples": ["Payment Frequency"],
+          "type": "string"
         }
       },
       "examples": [
@@ -270,7 +301,6 @@
     }
   ],
   "validation": {
-    "confidence_threshold": 0.8,
-    "default_example_confidence": 0.9
+    "confidence_threshold": 0.8
   }
 }

@@ -47,7 +47,7 @@ def excel_to_markdown(file_path, config: AppConfig, sheet_name=None):
             console.print(f"[green]Converted CSV to markdown (rows {config.start_row}-{config.end_row-1})[/green]")
             return result.text_content
             
-        elif file_path.endswith(('.xls', '.xlsx')):
+        elif file_path.endswith(('.xls', '.xlsx', '.XLS')):
             temp_suffix = '.xlsx'
             markdown_results = []
             

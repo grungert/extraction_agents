@@ -86,7 +86,7 @@ def main():
         # Get all Excel files in the directory
         files_to_process = []
         for filename in os.listdir(input_dir):
-            if filename.endswith(('.xlsx', '.xls', '.csv')):
+            if filename.endswith(('.xlsx', '.xls', '.csv', '.XLS')):
                 files_to_process.append(os.path.join(input_dir, filename))
         
         if not files_to_process:

@@ -27,9 +27,10 @@ def get_extraction_examples_from_config(
         # Use PascalCase keys directly from expected fields
         expected = example.get("expected", {}).copy()
         
-        # Add validation confidence if not present, using the config-defined default
+        # Add validation confidence if not present, generate random 0.9-1.0
+        import random
         if "ValidationConfidence" not in expected:
-            expected["ValidationConfidence"] = config_manager.get_default_example_confidence()
+            expected["ValidationConfidence"] = round(random.uniform(0.9, 1.0), 3)
         
         examples.append({
             "table": example.get("table", ""),
@@ -72,10 +73,9 @@ def create_validation_example(example: Dict[str, Any], config_manager: Optional[
     # Create the validation input
     validation_example["modified_json"] = modified_json
     
-    # Get default confidence value from config or fallback to 0.9
-    default_confidence = 0.9
-    if config_manager:
-        default_confidence = config_manager.get_default_example_confidence()
+    # Generate random default confidence 0.9-1.0
+    import random
+    default_confidence = round(random.uniform(0.9, 1.0), 3)
     
     # Create the expected validation output
     validation_example["validation_output"] = {

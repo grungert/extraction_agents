@@ -8,19 +8,15 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import (
     AIMessage, 
     BaseMessage, 
-    HumanMessage, 
-    SystemMessage, 
+    HumanMessage,  
     ToolMessage
 )
 from ..utils.display import console
 from ..models import (
     AppConfig, 
-    Data, 
     Example,
     EXTRACTION_MODELS
 )
-from ..config_manager import get_configuration_manager
-from ..dynamic_model_factory import create_extraction_models_dict
 
 def configure_llm(config: AppConfig):
     """

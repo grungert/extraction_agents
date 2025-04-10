@@ -134,15 +134,6 @@ class ConfigurationManager:
         """
         return self.config.get("validation", {})
         
-    def get_default_example_confidence(self) -> float:
-        """
-        Get the default confidence score to use for examples that don't specify one.
-        
-        Returns:
-            Default confidence score (0.0-1.0)
-        """
-        validation_config = self.get_validation_config()
-        return validation_config.get("default_example_confidence", 0.9)
     
     def get_extraction_models(self) -> List[Dict[str, Any]]:
         """

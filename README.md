@@ -75,24 +75,27 @@ curl -X POST "http://localhost:8000/extract" \
 
 ## To do
 
-- Extracts **currency symbols** and **formats** from Excel.
-- Supports `.xlsx`, `.xls` (with conversion), `.csv`.
-- Trims empty columns for clean output.
-- Modular, extensible design.
-        * Option C: Calculate a score based on specific criteria?
-
-    ```json
-    "validation": {
-      "confidence_threshold": 0.8,
-      "default_example_confidence": 0.9
-    }
-    ```
+- Extracts **currency symbols** and **formats** from Excel. Done for xlsx, need to find solution for xls
 
 * **Address duplicate header data resulting from separate group extractions.**
     * *Problem:* Data extraction is currently performed separately for each data group. Consequently, the same header information can appear in multiple extracted groups.
     * *Task:* Define a method to handle this redundancy (e.g., consolidate, deduplicate) after the initial extraction phase.
 
+* **Add information about type of extraction**
+
+It can be:
+- column: The information is located in a header cell of a specific column.
+- row: The information is located in a specific row of the table.
+- fixed: The information is always in a particular cell within the table.
+- deductive: I need to analyze the data within the table to infer or deduce the required information.
+
+
+* **How to create examples more dynamicly**
+
 * **Logic to process - How validation agent to handle**
+
+Change how validation agent is processed
+
 ```mermaid
 flowchart TD
     Input[Excel/CSV Input] --> Convert[Convert to Markdown]
@@ -116,4 +119,3 @@ flowchart TD
         Process -.-> Output
     end
 ```
-#  acees to git

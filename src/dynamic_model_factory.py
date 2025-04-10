@@ -22,9 +22,31 @@ def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:
     for field_name, field_def in model_def.get("fields", {}).items():
         # Use PascalCase field names directly
         description = field_def.get("description", "")
+        examples = field_def.get("examples", [])
+        if examples:
+            description += f". Possible headers: {', '.join(examples)}"
         
-        # All fields are optional strings by default
-        fields[field_name] = (Optional[str], Field(None, description=description))
+        type_str = field_def.get("type", "string").lower()
+
+        type_map = {
+            "string": str,
+            "int": int,
+            "float": float,
+            "bool": bool,
+            "date": "date",       # Placeholder, will be replaced below
+            "datetime": "datetime" # Placeholder
+        }
+
+        py_type = type_map.get(type_str, str)
+
+        # Import datetime types
+        from datetime import date as dt_date, datetime as dt_datetime
+        if py_type == "date":
+            py_type = dt_date
+        elif py_type == "datetime":
+            py_type = dt_datetime
+
+        fields[field_name] = (Optional[py_type], Field(None, description=description))
     
     # Add ValidationConfidence field that's standard in BaseExtraction
     fields["ValidationConfidence"] = (Optional[float], Field(None, description="Confidence in validation (0.0-1.0)"))
