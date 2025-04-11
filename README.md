@@ -52,6 +52,7 @@ curl -X POST "http://localhost:8000/extract" \
   - Header detection settings and examples.
   - Extraction models, fields, and examples.
   - Validation thresholds.
+- **Application Settings:** Additional settings like `include_header_examples_in_prompt` (default: `true`) control behavior like injecting field examples into LLM prompts. These are managed within the `AppConfig` model (`src/models.py`).
 
 ---
 
@@ -93,9 +94,7 @@ It can be:
 
 * **How to create examples more dynamicly**
 
-* **Logic to process - How validation agent to handle**
-
-Change how validation agent is processed
+* **Extraction process diagram**
 
 ```mermaid
 flowchart TD

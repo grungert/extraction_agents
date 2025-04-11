@@ -10,7 +10,8 @@
 #   "langchain-openai>=0.1.0",
 #   "xlrd >= 2.0.1",
 #   "markitdown[all] >= 0.1.0",
-#   "langfuse>=0.1.0"
+#   "langfuse>=0.1.0",
+#   "jinja2>=3.0.0",
 # ]
 # ///
 """LLM-based extraction pipeline for parsing Excel files."""

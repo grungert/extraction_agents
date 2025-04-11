@@ -264,16 +264,19 @@ class DynamicHeaderDetectionAgent:
 class DynamicExtractionAgent:
     """Agent for extracting structured data from Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
         """
         Initialize the extraction agent.
         
         Args:
             llm: LLM instance to use for extraction
             config_manager: Configuration manager, or None to use default
+            app_config: Application configuration instance
         """
         self.llm = llm
         self.config_manager = config_manager or get_configuration_manager()
+        # Store app_config if provided, otherwise load default AppConfig for standalone use
+        self.app_config = app_config or AppConfig() 
         self.section_messages = {}
         
     def extract_data(self, markdown_content: str, header_info: ContextModel, 
@@ -300,9 +303,9 @@ class DynamicExtractionAgent:
             console.print(f"[cyan]Extraction Agent Input for {section_name}:[/cyan]")
             console.print(focused_content[:500] + "..." if len(focused_content) > 500 else focused_content)
             
-            # Get or create example messages for this section
+            # Get or create example messages for this section, passing app_config
             if section_name not in self.section_messages:
-                self.section_messages[section_name] = self._create_section_messages(section_name)
+                self.section_messages[section_name] = self._create_section_messages(section_name, self.app_config)
                 
             # Extract data
             result = extract_section(
@@ -348,22 +351,26 @@ class DynamicExtractionAgent:
         
         return '\n'.join(focused_lines)
         
-    def _create_section_messages(self, section_name: str) -> List[Dict]:
+    def _create_section_messages(self, section_name: str, app_config: AppConfig) -> List[Dict]:
         """
-        Create example messages for a specific section.
+        Create example messages for a specific section, including conditional examples in the system prompt.
         
         Args:
             section_name: Name of the section
+            app_config: Application configuration instance
             
         Returns:
             List of message dictionaries for the LLM
         """
-        # Load system message template from prompt file
+        # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
-        system_message = {
-            "role": "system",
-            "content": load_template_prompt("section_extraction_system_template.md", section_name=section_name)
-        }
+        system_content = load_template_prompt(
+            "section_extraction_system_template.md", 
+            section_name=section_name,
+            config_manager=self.config_manager,
+            app_config=app_config
+        )
+        system_message = {"role": "system", "content": system_content}
         
         # Format examples for extraction using the dynamic examples manager
         return format_extraction_messages(self.config_manager, section_name, system_message)
@@ -372,16 +379,19 @@ class DynamicExtractionAgent:
 class DynamicValidationAgent:
     """Agent for validating and correcting extracted data using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
         """
         Initialize the validation agent.
         
         Args:
             llm: LLM instance to use for validation
             config_manager: Configuration manager, or None to use default
+            app_config: Application configuration instance
         """
         self.llm = llm
         self.config_manager = config_manager or get_configuration_manager()
+        # Store app_config if provided, otherwise load default AppConfig for standalone use
+        self.app_config = app_config or AppConfig()
         self.section_messages = {}  # Initialize empty dictionary for section-specific messages
         
     def validate(self, extracted_data: BaseExtraction, markdown_content: str, header_info: ContextModel,
@@ -426,9 +436,9 @@ class DynamicValidationAgent:
             # Create validation model class that extends the original
             validation_model = self._create_validation_model(model_class)
             
-            # Get or create example messages for this section
+            # Get or create example messages for this section, passing app_config
             if section_name not in self.section_messages:
-                self.section_messages[section_name] = self._create_section_validation_messages(section_name)
+                self.section_messages[section_name] = self._create_section_validation_messages(section_name, self.app_config)
             
             # Validate data using section-specific messages
             result = extract_section(
@@ -493,22 +503,26 @@ class DynamicValidationAgent:
             
         return CombinedValidationModel
         
-    def _create_section_validation_messages(self, section_name: str) -> List[Dict]:
+    def _create_section_validation_messages(self, section_name: str, app_config: AppConfig) -> List[Dict]:
         """
-        Create example messages for validation of a specific section.
+        Create example messages for validation of a specific section, including conditional examples in the system prompt.
         
         Args:
             section_name: Name of the section
+            app_config: Application configuration instance
             
         Returns:
             List of message dictionaries for the LLM
         """
-        # Load system message template from prompt file
+        # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
-        system_message = {
-            "role": "system",
-            "content": load_template_prompt("section_validation_system_template.md", section_name=section_name)
-        }
+        system_content = load_template_prompt(
+            "section_validation_system_template.md", 
+            section_name=section_name,
+            config_manager=self.config_manager,
+            app_config=app_config
+        )
+        system_message = {"role": "system", "content": system_content}
         
         # Format examples for validation using the dynamic examples manager
         # Pass the section_name to get only examples for this specific section
@@ -530,14 +544,18 @@ class DynamicAgentPipelineCoordinator:
         self.config_manager = config_manager or get_configuration_manager(config.config_path)
         self.llm = configure_llm(config)
         
-        # Initialize agents with dynamic configuration
+        # Initialize agents with dynamic configuration, passing app_config
         self.header_agent = DynamicHeaderDetectionAgent(self.llm, self.config_manager)
         self.header_validation_agent = DynamicHeaderValidationAgent(self.llm, self.config_manager)
-        self.extraction_agent = DynamicExtractionAgent(self.llm, self.config_manager)
-        self.validation_agent = DynamicValidationAgent(self.llm, self.config_manager)
+        self.extraction_agent = DynamicExtractionAgent(self.llm, self.config_manager, self.config)
+        self.validation_agent = DynamicValidationAgent(self.llm, self.config_manager, self.config)
         
         # Get the dynamically configured extraction models
-        self.extraction_models = create_extraction_models_dict(self.config_manager)
+        # Pass the include_examples flag from AppConfig
+        self.extraction_models = create_extraction_models_dict(
+            self.config_manager, 
+            include_examples=self.config.include_header_examples_in_prompt
+        )
         
     def process_markdown(self, markdown_content: str, source_file: str) -> Dict:
         """
@@ -687,15 +705,22 @@ class DynamicAgentPipelineCoordinator:
 
 
 # Helper function to get extraction models from config manager
-def create_extraction_models_dict(config_manager: ConfigurationManager) -> Dict[str, Type[BaseExtraction]]:
+def create_extraction_models_dict(
+    config_manager: ConfigurationManager, 
+    include_examples: bool = True  # Add the argument here
+) -> Dict[str, Type[BaseExtraction]]:
     """
     Create a dictionary mapping section names to model classes.
     
     Args:
         config_manager: Configuration manager instance
+        include_examples: Whether to include examples in model descriptions
         
     Returns:
         Dictionary mapping section names to model classes
     """
-    from ..dynamic_model_factory import create_extraction_models_dict
-    return create_extraction_models_dict(config_manager)
+    # Import the function from the factory
+    from ..dynamic_model_factory import create_extraction_models_dict as factory_create_models
+    
+    # Call the factory function, passing the include_examples flag
+    return factory_create_models(config_manager, include_examples=include_examples)

@@ -22,6 +22,7 @@ class AppConfig(BaseModel):
     all_sheets: bool = False
     model: ModelConfig = ModelConfig()
     config_path: str = "config/full_config.json"
+    include_header_examples_in_prompt: bool = False
 
 # Extraction models - base class
 class BaseExtraction(BaseModel):
@@ -65,8 +66,13 @@ try:
     # Get configuration manager
     config_manager = get_configuration_manager()
     
-    # Load dynamic models
-    EXTRACTION_MODELS = create_extraction_models_dict(config_manager)
+    # Load dynamic models, passing the flag from AppConfig
+    # Create a default AppConfig instance to access the flag if not otherwise available
+    app_config_instance = AppConfig()
+    EXTRACTION_MODELS = create_extraction_models_dict(
+        config_manager, 
+        include_examples=app_config_instance.include_header_examples_in_prompt
+    )
 except Exception as e:
     # Fall back to empty dictionary if loading fails
     print(f"Error loading dynamic models: {str(e)}")

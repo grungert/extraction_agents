@@ -4,14 +4,23 @@ from pydantic import Field, create_model
 
 from .models import BaseExtraction
 from .config_manager import ConfigurationManager
+# Assuming AppConfig is accessible, adjust import if needed
+try:
+    from .models import AppConfig
+except ImportError:
+    AppConfig = None
 
 
-def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:
+def create_model_from_config(
+    model_def: Dict[str, Any], 
+    include_examples: bool = True  # Flag to control example inclusion in description
+) -> Type[BaseExtraction]:
     """
     Dynamically create a Pydantic model from a configuration definition.
     
     Args:
         model_def: Dictionary containing model definition
+        include_examples: Whether to include examples in field descriptions
         
     Returns:
         A dynamically created Pydantic model class
@@ -23,7 +32,8 @@ def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:
         # Use PascalCase field names directly
         description = field_def.get("description", "")
         examples = field_def.get("examples", [])
-        if examples:
+        # Conditionally add examples to the description
+        if examples and include_examples:
             description += f". Possible headers values: {', '.join(examples)}"
         
         type_str = field_def.get("type", "string").lower()
@@ -66,12 +76,16 @@ def create_model_from_config(model_def: Dict[str, Any]) -> Type[BaseExtraction]:
     return model_class
 
 
-def create_models_from_config(config_manager: ConfigurationManager) -> Dict[str, Type[BaseExtraction]]:
+def create_models_from_config(
+    config_manager: ConfigurationManager, 
+    include_examples: bool = True  # Pass flag down
+) -> Dict[str, Type[BaseExtraction]]:
     """
     Create all models defined in the configuration.
     
     Args:
         config_manager: Configuration manager instance
+        include_examples: Whether to include examples in field descriptions
         
     Returns:
         Dictionary mapping model names to model classes
@@ -80,7 +94,8 @@ def create_models_from_config(config_manager: ConfigurationManager) -> Dict[str,
     
     for model_def in config_manager.get_extraction_models():
         model_name = model_def.get("name")
-        model_class = create_model_from_config(model_def)
+        # Pass the flag when creating individual models
+        model_class = create_model_from_config(model_def, include_examples)
         models[model_name] = model_class
     
     return models
@@ -118,23 +133,24 @@ def format_examples_from_config(config_manager: ConfigurationManager, model_name
     return examples
 
 
-def create_extraction_models_dict(config_manager: ConfigurationManager) -> Dict[str, Type[BaseExtraction]]:
+def create_extraction_models_dict(
+    config_manager: ConfigurationManager, 
+    include_examples: bool = True # Pass flag down
+) -> Dict[str, Type[BaseExtraction]]:
     """
     Create a dictionary mapping section names to model classes.
     
     Args:
         config_manager: Configuration manager instance
+        include_examples: Whether to include examples in field descriptions
         
     Returns:
         Dictionary mapping section names to model classes
     """
-    # Create all models
-    models = create_models_from_config(config_manager)
+    # Create all models, passing the flag
+    models = create_models_from_config(config_manager, include_examples)
     
-    # Map section names to model classes
-    extraction_models = {}
-    for model_name, model_class in models.items():
-        # Use the model name as the section name
-        extraction_models[model_name] = model_class
+    # Map section names to model classes (using model name as section name)
+    extraction_models = {name: model for name, model in models.items()}
     
     return extraction_models
