@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, create_model
 # Configuration models
 class ModelConfig(BaseModel):
     """Configuration for the LLM model."""
-    model_name: str = "gemma-3-12b-it"
+    model_name: str = "llama-3.2-3b-instruct"
     base_url: str = "http://localhost:1234/v1"
     api_key: str = "null"
     temperature: float = 0.3
@@ -22,7 +22,7 @@ class AppConfig(BaseModel):
     all_sheets: bool = False
     model: ModelConfig = ModelConfig()
     config_path: str = "config/full_config.json"
-    include_header_examples_in_prompt: bool = False
+    include_header_examples_in_prompt: bool = True
 
 # Extraction models - base class
 class BaseExtraction(BaseModel):

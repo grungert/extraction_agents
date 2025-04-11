@@ -17,6 +17,8 @@ from ..models import (
     Example,
     EXTRACTION_MODELS
 )
+from ..config_manager import get_configuration_manager
+from ..dynamic_model_factory import create_extraction_models_dict
 
 def configure_llm(config: AppConfig):
     """
