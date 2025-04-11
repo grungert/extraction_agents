@@ -76,8 +76,6 @@ curl -X POST "http://localhost:8000/extract" \
 
 ## To do
 
-- Extracts **currency symbols** and **formats** from Excel. Done for xlsx, need to find solution for xls
-
 * **Address duplicate header data resulting from separate group extractions.**
     * *Problem:* Data extraction is currently performed separately for each data group. Consequently, the same header information can appear in multiple extracted groups.
     * *Task:* Define a method to handle this redundancy (e.g., consolidate, deduplicate) after the initial extraction phase.
