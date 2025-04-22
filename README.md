@@ -80,6 +80,10 @@ curl -X POST "http://localhost:8000/extract" \
     * *Problem:* Data extraction is currently performed separately for each data group. Consequently, the same header information can appear in multiple extracted groups.
     * *Task:* Define a method to handle this redundancy (e.g., consolidate, deduplicate) after the initial extraction phase.
 
+* **Access to the Hill git**
+
+* **Ground truth status**
+
 * **Agent csv to markdown table**
     * Create agent if csv dont have table infor to convert table to markdown  
 
