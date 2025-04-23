@@ -114,14 +114,16 @@ def excel_to_markdown(file_path, config: AppConfig, sheet_name=None):
         nrows = config.end_row - config.start_row
 
         if file_path_lower.endswith('.csv'):
-            console.print(f"[dim]Processing CSV file: {file_path}[/dim]")
-            df = pd.read_csv(file_path, skiprows=config.start_row, nrows=nrows,
-                             dtype=str, header=None, keep_default_na=False)
-            temp_suffix = '.csv'
-
-            with tempfile.NamedTemporaryFile(suffix=temp_suffix, delete=False) as temp_file:
-                temp_path = temp_file.name
-            df.to_csv(temp_path, index=False, header=False)
+            from pathlib import Path
+            from csv_to_md import csv_to_markdown
+            rows = config.end_row - config.start_row
+            markdown = csv_to_markdown(Path(file_path), rows)
+            # Remove header and separator rows from markdown output
+            lines = markdown.splitlines()
+            if len(lines) > 2:
+                markdown = "\n".join(lines[2:])
+            console.print(f"[green]Converted CSV to markdown (rows {config.start_row}-{config.end_row-1})[/green]")
+            return markdown
 
         elif file_path_lower.endswith(('.xls', '.xlsx')):
             sheet_param = sheet_name if sheet_name else (0 if not config.all_sheets else None)
