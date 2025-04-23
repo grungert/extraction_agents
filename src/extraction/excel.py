@@ -109,9 +109,11 @@ def get_formatted_dataframe(file_path, sheet_name, start_row, end_row):
 
 def excel_to_markdown(file_path, config: AppConfig, sheet_name=None):
     try:
+        # Use lowercase extension checks for case-insensitive matching
+        file_path_lower = file_path.lower()
         nrows = config.end_row - config.start_row
 
-        if file_path.endswith('.csv'):
+        if file_path_lower.endswith('.csv'):
             console.print(f"[dim]Processing CSV file: {file_path}[/dim]")
             df = pd.read_csv(file_path, skiprows=config.start_row, nrows=nrows,
                              dtype=str, header=None, keep_default_na=False)
@@ -121,7 +123,7 @@ def excel_to_markdown(file_path, config: AppConfig, sheet_name=None):
                 temp_path = temp_file.name
             df.to_csv(temp_path, index=False, header=False)
 
-        elif file_path.endswith(('.xls', '.xlsx')):
+        elif file_path_lower.endswith(('.xls', '.xlsx')):
             sheet_param = sheet_name if sheet_name else (0 if not config.all_sheets else None)
             df = get_formatted_dataframe(file_path, sheet_param, config.start_row, config.end_row)
             temp_suffix = '.xlsx'
