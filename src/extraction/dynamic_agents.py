@@ -153,8 +153,6 @@ class DynamicClassificationAgent:
             # Combine messages into a single string for direct invocation
             final_prompt_text = "".join([msg.content for msg in formatted_messages])
 
-            console.print(f"[dim]Classification Prompt (truncated): {final_prompt_text[:300]}...[/dim]")
-
             # Call LLM directly (no structured output needed here)
             llm_response = self.llm.invoke(final_prompt_text)
             
@@ -298,8 +296,6 @@ class DynamicClassificationValidationAgent:
                 previous_class=classification_output.predicted_class
             )
             final_prompt_text = "".join([msg.content for msg in formatted_messages])
-
-            console.print(f"[dim]Validation Prompt (truncated): {final_prompt_text[:300]}...[/dim]")
 
             llm_response = self.llm.invoke(final_prompt_text)
             
@@ -612,7 +608,7 @@ class DynamicHeaderDetectionAgent:
 class DynamicExtractionAgent:
     """Agent for extracting structured data from Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Keep config_manager removed
         """
         Initialize the extraction agent.
         
@@ -738,7 +734,7 @@ class DynamicExtractionAgent:
 class DynamicValidationAgent:
     """Agent for validating and correcting extracted data using dynamic configuration."""
     
-    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Keep config_manager removed
         """
         Initialize the validation agent.
         
@@ -971,13 +967,27 @@ class DynamicAgentPipelineCoordinator:
         
         # --- Conditional Logic ---
         validated_class = validation_output.predicted_class
-        if validated_class == "Mutual Funds":
-            # Construct the specific config path
-            config_file_name = f"full_config_{validated_class.replace(' ', '_')}.json" # e.g., full_config_Mutual_Funds.json
+        
+        # Handle cases where classification is uncertain or unsupported
+        if validated_class == "None of those":
+            console.print(f"[yellow]Skipping extraction because classification result is '{validated_class}'[/yellow]")
+            # Add timing info and return early
+            end_time = time.perf_counter()
+            processing_time = end_time - start_time
+            # Ensure Classification key exists before adding time
+            if "Classification" not in ordered_results: ordered_results["Classification"] = {}
+            ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3) # Add time directly if no other context
+            console.print(f"[cyan]Total processing time (skipped extraction): {processing_time:.3f} seconds[/cyan]")
+            return ordered_results
+        else:
+            # Proceed with dynamic config loading for the validated class
+            console.print(f"[blue]Attempting to load configuration for class: '{validated_class}'[/blue]")
+            # Construct the specific config path dynamically
+            config_file_name = f"full_config_{validated_class.replace(' ', '_')}.json" 
             config_path = os.path.join("config", config_file_name)
 
             if not os.path.exists(config_path):
-                console.print(f"[red]Error: Config file not found: {config_path}[/red]")
+                console.print(f"[red]Error: Config file not found for class '{validated_class}': {config_path}[/red]")
                 # Add timing info before returning error
                 end_time = time.perf_counter()
                 processing_time = end_time - start_time
@@ -1007,9 +1017,9 @@ class DynamicAgentPipelineCoordinator:
                  ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
                  return {"error": f"Failed to load config/models for {validated_class}", **ordered_results}
 
-            console.print(f"[green]Proceeding for '{validated_class}' using '{config_path}'[/green]")
+            console.print(f"[green]Proceeding with extraction for class '{validated_class}' using '{config_path}'[/green]")
 
-            # --- Existing Pipeline Steps (Modified to use dynamically loaded config) ---
+            # --- Existing Pipeline Steps (Now run for any valid class with a config file) ---
             
             # Step: Header Detection 
             # Pass config manager to agent instance for this run
@@ -1133,16 +1143,7 @@ class DynamicAgentPipelineCoordinator:
                 else:
                     console.print("[yellow]⚠[/yellow] Deduplication failed, using original extraction results")
 
-        else: # Not Mutual Funds
-            console.print(f"[yellow]Skipping extraction for class: '{validated_class}'[/yellow]")
-            # Add timing info and return early
-            end_time = time.perf_counter()
-            processing_time = end_time - start_time
-            ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
-            console.print(f"[cyan]Total processing time (skipped extraction): {processing_time:.3f} seconds[/cyan]")
-            return ordered_results 
-
-        # --- Final processing for the successful Mutual Funds case ---
+        # --- Final processing (runs only if class was not "None of those" and config was found) ---
         end_time = time.perf_counter()
         processing_time = end_time - start_time
         
@@ -1158,7 +1159,7 @@ class DynamicAgentPipelineCoordinator:
 class DynamicDeduplicationAgent:
     """Agent for resolving header conflicts between extraction models."""
     
-    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Keep config_manager removed
         """Initialize the deduplication agent."""
         self.llm = llm
         self.config_manager = None # Initialize as None
