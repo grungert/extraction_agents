@@ -32,8 +32,9 @@ def main():
     """Run the dynamic agent pipeline."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="LLM-based extraction pipeline for Excel files")
-    parser.add_argument("--config", type=str, default="config/full_config.json", 
-                        help="Path to configuration file")
+    # Config argument is no longer needed as it's determined dynamically
+    # parser.add_argument("--config", type=str, default=None, 
+    #                     help="Path to base configuration file (optional, specific config loaded based on classification)")
     parser.add_argument("--file", type=str, default=None,
                         help="Path to specific Excel file to process (if not provided, processes all Excel files in input_dir)")
     parser.add_argument("--sheet", type=str, default=None,
@@ -43,21 +44,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Load configuration
-    console.print(f"[blue]Loading configuration from {args.config}...[/blue]")
-    config_manager = get_configuration_manager(args.config)
-    
-    # Display loaded models
-    extraction_models = config_manager.get_extraction_models()
-    console.print(f"[green]Loaded {len(extraction_models)} extraction models:[/green]")
-    for model in extraction_models:
-        model_name = model["name"]
-        field_count = len(model["fields"])
-        example_count = len(model["examples"])
-        console.print(f"  • {model_name} ({field_count} fields, {example_count} examples)")
-    
-    # Create app config with the specified configuration path
-    app_config = AppConfig(config_path=args.config)
+    # Load base AppConfig settings from models.py defaults
+    console.print("[blue]Loading base application configuration...[/blue]")
+    app_config = AppConfig() 
+    # Note: Specific extraction config (like full_config_Mutual_Funds.json) 
+    # is now loaded inside the pipeline coordinator based on classification.
     
     # Initialize the agent pipeline
     console.print("[blue]Initializing dynamic agent pipeline...[/blue]")

@@ -13,6 +13,16 @@ class ModelConfig(BaseModel):
     temperature: float = 0.2
     max_retries: int = 2
 
+class ClassificationModelConfig(BaseModel):
+    """Configuration specific to the classification LLM."""
+    model_name: str = "claude2-alpaca-7b"
+    base_url: str = "http://localhost:1234/v1"
+    api_key: str = "null"
+    temperature: float = 0.3
+    max_tokens: int = 4000
+    context_window_percentage: float = 0.45
+    max_retries: int = 2 # Inherit or set specific retries
+
 class AppConfig(BaseModel):
     """Application configuration."""
     input_dir: str = "input"
@@ -20,23 +30,46 @@ class AppConfig(BaseModel):
     start_row: int = 0
     end_row: int = 15
     all_sheets: bool = False
-    model: ModelConfig = ModelConfig()
-    config_path: str = "config/full_config.json"
+    model: ModelConfig = ModelConfig() # Main model config
+    classification_model: ClassificationModelConfig = ClassificationModelConfig() # Classification model config
+    # config_path removed - will be determined dynamically
     include_header_examples_in_prompt: bool = True
     enable_deduplication_agent: bool = True
+    classification_prompt: str = "classifier_agent_v2_2.md"
+    classification_validation_prompt: str = "classifier_validation_agent_v1.md"
+    classification_labels: List[str] = Field(default_factory=lambda: [
+        "Mutual Funds", "ETF", "Stocks", "Bonds", "Real State", 
+        "Crypto Asset", "Commodities", "Private Equities", "Index", 
+        "Currencies Pairs", "None of those"
+    ])
 
-# Extraction models - base class
+# --- Output Models ---
+
+# Base for extractions
 class BaseExtraction(BaseModel):
     """Base model that all extraction models should inherit from."""
-    ValidationConfidence: Optional[float] = Field(None, description="Confidence in validation (0.0-1.0)")
+    ValidationConfidence: Optional[float] = Field(None, description="Confidence score (0.0-1.0)")
 
-# Validation model base class
+# Classification Output
+class ClassificationOutput(BaseModel):
+    """Output from the classification agent."""
+    predicted_class: str = Field(..., description="The class predicted by the LLM.")
+    confidence: str = Field(..., description="The confidence description (e.g., High, Medium, Low).")
+
+# Classification Validation Output
+class ClassificationValidationOutput(BaseModel):
+    """Output from the classification validation agent."""
+    predicted_class: str = Field(..., description="The validated or corrected class.")
+    confidence: str = Field(..., description="The confidence description after validation.")
+    validation_reason: Optional[str] = Field(None, description="Reason if validation changed the class or confidence.")
+
+# General Validation Result (for section validation)
 class ValidationResult(BaseModel):
-    """Base model for validation results."""
+    """Base model for section validation results."""
     ValidationConfidence: float = Field(0.0, description="Confidence in validation (0.0-1.0)")
     CorrectionsMade: List[str] = Field([], description="List of corrections made during validation")
 
-# Context section
+# Context section (inherits BaseExtraction for ValidationConfidence)
 class ContextModel(BaseExtraction):
     """Model for extracting context information."""
     FileName: Optional[str] = Field(None, description="File name of the Excel document")

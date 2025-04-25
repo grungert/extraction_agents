@@ -66,6 +66,44 @@ def configure_llm(config: AppConfig):
     
     return llm
 
+def configure_llm_classification(config: AppConfig):
+    """
+    Configure the LLM specifically for classification tasks.
+    
+    Args:
+        config (AppConfig): Application configuration containing classification_model settings
+        
+    Returns:
+        ChatOpenAI: Configured LLM instance for classification
+    """
+    # Load environment variables from .env file
+    load_dotenv()
+    
+    # Use classification-specific model config
+    class_config = config.classification_model
+    
+    # Initialize LLM
+    llm = ChatOpenAI(
+        model_name=class_config.model_name,
+        base_url=class_config.base_url,
+        api_key=class_config.api_key,
+        temperature=class_config.temperature,
+        max_retries=class_config.max_retries
+    )
+    
+    # Add Langfuse monitoring if enabled (using the same global setting)
+    if os.getenv("LANGFUSE_ENABLED", "false").lower() == "true":
+        try:
+            from langfuse.callback import CallbackHandler
+            langfuse_handler = CallbackHandler()
+            # No need to auth_check again if done for main LLM
+            llm.callbacks = [langfuse_handler]
+            # console.print("[green]✓[/green] Langfuse monitoring enabled for Classification LLM") # Optional log
+        except Exception as e:
+            console.print(f"[yellow]⚠[/yellow] Failed to initialize Langfuse for Classification LLM: {str(e)}")
+            
+    return llm
+
 def create_extraction_prompt(section_name=None):
     """
     Create a prompt template for extraction with optional section focus.

@@ -14,24 +14,351 @@ from ..models import (
 from .llm import extract_section, configure_llm
 from ..config_manager import ConfigurationManager, get_configuration_manager
 from ..examples.dynamic_examples import format_extraction_messages, format_validation_messages
+# Import necessary components for classification agents
+from langchain_core.messages import HumanMessage
+import tiktoken 
+from ..models import ClassificationOutput, ClassificationValidationOutput, AppConfig # Import new models
+
+# Helper function to get tokenizer (moved here for encapsulation or keep in utils)
+def get_tokenizer(tokenizer_name: str = "cl100k_base"):
+    try:
+        return tiktoken.get_encoding(tokenizer_name)
+    except Exception as e:
+        console.print(f"[yellow]⚠[/yellow] Error loading tiktoken encoding '{tokenizer_name}': {e}. Token counting may be inaccurate.")
+        return None
+
+# Helper function to count tokens (moved here or keep in utils)
+def count_tokens(encoding, text):
+    if encoding:
+        return len(encoding.encode(text))
+    # Estimate if no encoding (very rough)
+    return len(text) // 4
+
+
+class DynamicClassificationAgent:
+    """Agent for classifying the document type."""
+    def __init__(self, llm, app_config: AppConfig):
+        self.llm = llm
+        self.app_config = app_config
+        self.labels = app_config.classification_labels
+        self.prompt_template = self._load_prompt_template(app_config.classification_prompt)
+        self.encoding = get_tokenizer() # Use default tokenizer
+
+    def _load_prompt_template(self, prompt_file_name):
+        from ..utils.prompt_utils import load_prompt # Local import
+        try:
+            # Assuming prompts are in src/prompts/
+            prompt_text = load_prompt(prompt_file_name)
+            # Use ChatPromptTemplate for potential future structure, though we invoke directly now
+            from langchain.prompts import ChatPromptTemplate 
+            return ChatPromptTemplate.from_template(prompt_text)
+        except FileNotFoundError:
+            console.print(f"[red]Error: Classification prompt file '{prompt_file_name}' not found.[/red]")
+            raise # Re-raise to stop pipeline if prompt is missing
+
+    def _prepare_input_text(self, markdown_content: str, doc_name: str) -> str:
+        """Truncates markdown content based on token limits."""
+        if not self.prompt_template:
+             return "" # Cannot calculate if prompt failed to load
+
+        # Estimate base prompt tokens (excluding the actual content)
+        try:
+            base_prompt_messages = self.prompt_template.format_messages(doc_name=doc_name, question="")
+            base_prompt_text = "".join([msg.content for msg in base_prompt_messages])
+            base_prompt_tokens = count_tokens(self.encoding, base_prompt_text)
+        except Exception as e:
+             console.print(f"[yellow]⚠[/yellow] Error estimating base prompt tokens: {e}. Using default truncation.")
+             base_prompt_tokens = 200 # Default estimate
+
+        # Calculate available tokens for content
+        max_llm_tokens = self.app_config.classification_model.max_tokens
+        context_percent = self.app_config.classification_model.context_window_percentage
+        available_tokens = int(max_llm_tokens * context_percent) - base_prompt_tokens
+
+        if available_tokens <= 0:
+            console.print(f"[yellow]⚠[/yellow] Warning: Base prompt tokens ({base_prompt_tokens}) exceed allowed limit ({int(max_llm_tokens * context_percent)}). No content will be used for classification.")
+            return ""
+
+        # Estimate characters per token (heuristic)
+        chars_per_token = 4 
+        max_chars = available_tokens * chars_per_token
+        
+        truncated_text = markdown_content[:max_chars]
+        
+        # Optional: Verify token count of truncated text (can be slow)
+        # actual_tokens = count_tokens(self.encoding, truncated_text)
+        # console.print(f"[dim]Truncated classification input to ~{actual_tokens} tokens / {len(truncated_text)} chars.[/dim]")
+
+        return truncated_text
+
+    def _parse_response(self, llm_response_text: str) -> Dict:
+        """Parses the raw LLM response to extract class and confidence."""
+        predicted_class = None
+        confidence = "Low" # Default confidence
+
+        # Try regex first (more specific)
+        class_match = re.search(r"<sol>(.*?)</sol>", llm_response_text, re.IGNORECASE | re.DOTALL)
+        if class_match:
+            predicted_class_raw = class_match.group(1).strip()
+            # Find the best match from labels
+            for label in self.labels:
+                if label.lower() == predicted_class_raw.lower():
+                    predicted_class = label
+                    break
+            if not predicted_class: # If raw match not in labels, check if any label is substring
+                 for label in self.labels:
+                     if label.lower() in predicted_class_raw.lower():
+                         predicted_class = label
+                         break
+            # If still not found, maybe it's "None of those" or similar
+            if not predicted_class and "none of those" in predicted_class_raw.lower():
+                 predicted_class = "None of those" # Normalize
+
+        # Fallback: Check if any label is directly mentioned if regex fails
+        if not predicted_class:
+            for label in self.labels:
+                # Use word boundaries to avoid partial matches like 'Fund' in 'Refund'
+                if re.search(r'\b' + re.escape(label) + r'\b', llm_response_text, re.IGNORECASE):
+                    predicted_class = label
+                    break
+        
+        # Simple confidence extraction (can be enhanced)
+        if predicted_class and predicted_class != "None of those":
+             # Basic confidence based on presence - could be refined
+             confidence = "Medium" # Assume medium if class found
+
+        if predicted_class:
+            # Ensure the predicted class is one of the allowed labels
+            if predicted_class not in self.labels:
+                 console.print(f"[yellow]⚠[/yellow] LLM predicted class '{predicted_class}' not in defined labels. Defaulting to 'None of those'. LLM Response: {llm_response_text}")
+                 predicted_class = "None of those"
+                 confidence = "Low"
+            return {"predicted_class": predicted_class, "confidence": confidence}
+        else:
+            console.print(f"[yellow]⚠[/yellow] Could not extract valid class from LLM classification response: {llm_response_text}. Defaulting to 'None of those'.")
+            return {"predicted_class": "None of those", "confidence": "Low"} # Default if extraction fails
+
+    def run(self, markdown_content: str, doc_name: str) -> Optional[ClassificationOutput]:
+        """Runs the classification agent."""
+        console.print("[blue]Running Classification Agent...[/blue]")
+        if not self.prompt_template:
+             return None # Cannot run without a prompt
+
+        try:
+            prepared_text = self._prepare_input_text(markdown_content, doc_name)
+            
+            # Format the prompt using the template
+            # Note: Langchain templates expect keyword arguments
+            formatted_messages = self.prompt_template.format_messages(question=prepared_text, doc_name=doc_name)
+            # Combine messages into a single string for direct invocation
+            final_prompt_text = "".join([msg.content for msg in formatted_messages])
+
+            console.print(f"[dim]Classification Prompt (truncated): {final_prompt_text[:300]}...[/dim]")
+
+            # Call LLM directly (no structured output needed here)
+            llm_response = self.llm.invoke(final_prompt_text)
+            
+            # Ensure response is string content
+            if hasattr(llm_response, 'content'):
+                 llm_response_text = llm_response.content
+            elif isinstance(llm_response, str):
+                 llm_response_text = llm_response
+            else:
+                 raise ValueError(f"Unexpected LLM response type: {type(llm_response)}")
+
+            console.print(f"[dim]Classification LLM Raw Response: {llm_response_text}[/dim]")
+
+            parsed_data = self._parse_response(llm_response_text)
+
+            if "error" in parsed_data:
+                console.print(f"[red]Error parsing classification response: {parsed_data['error']}[/red]")
+                # Return a default or raise error? Returning default for now.
+                return ClassificationOutput(predicted_class="None of those", confidence="Low")
+            else:
+                output = ClassificationOutput(**parsed_data)
+                console.print(f"[green]✓[/green] Classification successful: Class='{output.predicted_class}', Confidence='{output.confidence}'")
+                return output
+
+        except Exception as e:
+            console.print(f"[red]Error during classification: {e}[/red]")
+            import traceback
+            traceback.print_exc() # Print full traceback for debugging
+            return None
+
+
+class DynamicClassificationValidationAgent:
+    """Agent for validating the classification."""
+    def __init__(self, llm, app_config: AppConfig):
+        self.llm = llm
+        self.app_config = app_config
+        self.labels = app_config.classification_labels
+        self.prompt_template = self._load_prompt_template(app_config.classification_validation_prompt)
+        self.encoding = get_tokenizer()
+
+    def _load_prompt_template(self, prompt_file_name):
+        from ..utils.prompt_utils import load_prompt # Local import
+        try:
+            prompt_text = load_prompt(prompt_file_name)
+            from langchain.prompts import ChatPromptTemplate
+            return ChatPromptTemplate.from_template(prompt_text)
+        except FileNotFoundError:
+            console.print(f"[red]Error: Classification validation prompt file '{prompt_file_name}' not found.[/red]")
+            raise
+
+    def _prepare_input_text(self, markdown_content: str, doc_name: str, previous_class: str) -> str:
+        """Truncates markdown content based on token limits for validation prompt."""
+        if not self.prompt_template:
+            return ""
+
+        try:
+            base_prompt_messages = self.prompt_template.format_messages(doc_name=doc_name, previous_class=previous_class, text="")
+            base_prompt_text = "".join([msg.content for msg in base_prompt_messages])
+            base_prompt_tokens = count_tokens(self.encoding, base_prompt_text)
+        except Exception as e:
+             console.print(f"[yellow]⚠[/yellow] Error estimating validation base prompt tokens: {e}. Using default truncation.")
+             base_prompt_tokens = 250 # Default estimate
+
+        max_llm_tokens = self.app_config.classification_model.max_tokens
+        context_percent = self.app_config.classification_model.context_window_percentage
+        available_tokens = int(max_llm_tokens * context_percent) - base_prompt_tokens
+
+        if available_tokens <= 0:
+            console.print(f"[yellow]⚠[/yellow] Warning: Validation base prompt tokens ({base_prompt_tokens}) exceed limit. No content used for validation.")
+            return ""
+
+        chars_per_token = 4
+        max_chars = available_tokens * chars_per_token
+        truncated_text = markdown_content[:max_chars]
+        
+        # Optional: Verify token count
+        # actual_tokens = count_tokens(self.encoding, truncated_text)
+        # console.print(f"[dim]Truncated validation input to ~{actual_tokens} tokens / {len(truncated_text)} chars.[/dim]")
+
+        return truncated_text
+
+    def _parse_response(self, llm_response_text: str) -> Dict:
+        """Parses the raw LLM response for validation."""
+        predicted_class = None
+        confidence = "Low"
+        reason = None
+
+        # Extract class
+        class_match = re.search(r"<class>(.*?)</class>", llm_response_text, re.IGNORECASE | re.DOTALL)
+        if class_match:
+            predicted_class_raw = class_match.group(1).strip()
+            # Normalize
+            for label in self.labels:
+                 if label.lower() == predicted_class_raw.lower():
+                     predicted_class = label
+                     break
+            if not predicted_class and "none of those" in predicted_class_raw.lower():
+                 predicted_class = "None of those"
+
+        # Fallback class extraction
+        if not predicted_class:
+             for label in self.labels:
+                 if re.search(r'\b' + re.escape(label) + r'\b', llm_response_text, re.IGNORECASE):
+                     predicted_class = label
+                     break
+
+        # Extract confidence
+        confidence_match = re.search(r"<confidence>(.*?)</confidence>", llm_response_text, re.IGNORECASE | re.DOTALL)
+        if confidence_match:
+            confidence = confidence_match.group(1).strip()
+        # else keep default "Low"
+
+        # Extract reason
+        reason_match = re.search(r"<reason>(.*?)</reason>", llm_response_text, re.IGNORECASE | re.DOTALL)
+        if reason_match:
+            reason = reason_match.group(1).strip()
+
+        if predicted_class:
+             if predicted_class not in self.labels:
+                 console.print(f"[yellow]⚠[/yellow] Validation LLM predicted class '{predicted_class}' not in labels. Defaulting to 'None of those'. LLM Response: {llm_response_text}")
+                 predicted_class = "None of those"
+                 confidence = "Low"
+             return {"predicted_class": predicted_class, "confidence": confidence, "validation_reason": reason}
+        else:
+            console.print(f"[yellow]⚠[/yellow] Could not extract valid class from LLM validation response: {llm_response_text}. Defaulting to 'None of those'.")
+            return {"predicted_class": "None of those", "confidence": "Low", "validation_reason": "Failed to parse LLM output."}
+
+
+    def run(self, markdown_content: str, doc_name: str, classification_output: ClassificationOutput) -> Optional[ClassificationValidationOutput]:
+        """Runs the classification validation agent."""
+        console.print("[blue]Running Classification Validation Agent...[/blue]")
+        if not self.prompt_template:
+            return None
+
+        try:
+            prepared_text = self._prepare_input_text(markdown_content, doc_name, classification_output.predicted_class)
+            
+            formatted_messages = self.prompt_template.format_messages(
+                text=prepared_text, 
+                doc_name=doc_name, 
+                previous_class=classification_output.predicted_class
+            )
+            final_prompt_text = "".join([msg.content for msg in formatted_messages])
+
+            console.print(f"[dim]Validation Prompt (truncated): {final_prompt_text[:300]}...[/dim]")
+
+            llm_response = self.llm.invoke(final_prompt_text)
+            
+            if hasattr(llm_response, 'content'):
+                 llm_response_text = llm_response.content
+            elif isinstance(llm_response, str):
+                 llm_response_text = llm_response
+            else:
+                 raise ValueError(f"Unexpected LLM response type: {type(llm_response)}")
+
+            console.print(f"[dim]Validation LLM Raw Response: {llm_response_text}[/dim]")
+
+            parsed_data = self._parse_response(llm_response_text)
+
+            if "error" in parsed_data:
+                console.print(f"[red]Error parsing validation response: {parsed_data['error']}[/red]")
+                # Return default validation output
+                return ClassificationValidationOutput(
+                    predicted_class=classification_output.predicted_class, # Keep original class
+                    confidence="Low", 
+                    validation_reason="Failed to parse validation response."
+                )
+            else:
+                output = ClassificationValidationOutput(**parsed_data)
+                console.print(f"[green]✓[/green] Validation successful: Class='{output.predicted_class}', Confidence='{output.confidence}'")
+                return output
+
+        except Exception as e:
+            console.print(f"[red]Error during classification validation: {e}[/red]")
+            import traceback
+            traceback.print_exc()
+            return None
 
 
 class DynamicHeaderValidationAgent:
     """Agent for validating header detection results using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
+    def __init__(self, llm): # Remove config_manager argument
         """
         Initialize the header validation agent.
         
         Args:
             llm: LLM instance to use for validation
-            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
-        self.config_manager = config_manager or get_configuration_manager()
-        self.messages = self._create_validation_messages()
+        self.config_manager = None # Initialize as None
+        self.messages = [] # Initialize as empty list
         
     def validate(self, header_info: ContextModel, markdown_content: str) -> Optional[ContextModel]:
+        # Ensure config_manager is set before creating messages
+        if self.config_manager is None:
+             console.print("[red]Error: Config manager not set for Header Validation Agent.[/red]")
+             return None
+        # Load messages here, using the dynamically set config_manager
+        if not self.messages: # Simple check
+            self.messages = self._create_validation_messages()
+            if not self.messages: # If loading failed
+                 console.print("[red]Error: Failed to load validation messages for Header Validation.[/red]")
+                 return None
         """
         Validate header detection results against the original table.
         
@@ -87,6 +414,11 @@ class DynamicHeaderValidationAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # This method now relies on self.config_manager being set before it's called
+        if not self.config_manager:
+             console.print("[yellow]⚠[/yellow] Cannot create header validation examples without config manager.")
+             return []
+
         # Get header validation configuration
         validation_config = self.config_manager.get_validation_config()
         
@@ -94,7 +426,7 @@ class DynamicHeaderValidationAgent:
         from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": load_prompt("header_validation_system_v1.md")
+            "content": load_prompt("header_validation_system_v1.md") # Consider making prompt name configurable?
         }
         
         # Load header examples from configuration manager
@@ -121,19 +453,30 @@ class DynamicHeaderValidationAgent:
 class DynamicHeaderDetectionAgent:
     """Agent for detecting header positions in Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None):
+    def __init__(self, llm): # Remove config_manager argument
         """
         Initialize the header detection agent.
         
         Args:
             llm: LLM instance to use for detection
-            config_manager: Configuration manager, or None to use default
         """
         self.llm = llm
-        self.config_manager = config_manager or get_configuration_manager()
-        self.messages = self._create_example_messages()
+        self.config_manager = None # Initialize as None
+        self.messages = [] # Initialize as empty list
         
     def detect_headers(self, markdown_content: str) -> Optional[ContextModel]:
+        # Ensure config_manager is set before creating messages
+        if self.config_manager is None:
+             console.print("[red]Error: Config manager not set for Header Detection Agent.[/red]")
+             return None
+        # Load messages here, using the dynamically set config_manager
+        # Check if messages need reloading (if config_manager changed or messages are empty)
+        if not self.messages: # Simple check, could be more robust if needed
+            self.messages = self._create_example_messages() 
+            if not self.messages: # If loading failed
+                 console.print("[red]Error: Failed to load example messages for Header Detection.[/red]")
+                 return None
+
         """
         Detect header positions in markdown content.
         
@@ -187,6 +530,11 @@ class DynamicHeaderDetectionAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # This method now relies on self.config_manager being set before it's called
+        if not self.config_manager:
+             console.print("[yellow]⚠[/yellow] Cannot create header examples without config manager.")
+             return [] # Return empty list or handle error
+
         # Get header detection configuration
         header_config = self.config_manager.get_header_detection_config()
         
@@ -194,7 +542,7 @@ class DynamicHeaderDetectionAgent:
         from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": load_prompt("header_detection_system_v1.md")
+            "content": load_prompt("header_detection_system_v1.md") # Consider making prompt name configurable?
         }
         
         # Load header examples from configuration manager
@@ -264,20 +612,19 @@ class DynamicHeaderDetectionAgent:
 class DynamicExtractionAgent:
     """Agent for extracting structured data from Excel sheets using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
         """
         Initialize the extraction agent.
         
         Args:
             llm: LLM instance to use for extraction
-            config_manager: Configuration manager, or None to use default
             app_config: Application configuration instance
         """
         self.llm = llm
-        self.config_manager = config_manager or get_configuration_manager()
+        self.config_manager = None # Initialize as None
         # Store app_config if provided, otherwise load default AppConfig for standalone use
         self.app_config = app_config or AppConfig() 
-        self.section_messages = {}
+        self.section_messages = {} # Initialize as empty, loaded at runtime
         
     def extract_data(self, markdown_content: str, header_info: ContextModel, 
                     section_name: str, model_class: Type[BaseExtraction]) -> Optional[BaseExtraction]:
@@ -294,7 +641,12 @@ class DynamicExtractionAgent:
             Extracted data or None if extraction failed
         """
         console.print(f"[blue]Extracting {section_name} data...[/blue]")
-        
+
+        # Ensure config_manager is set
+        if self.config_manager is None:
+             console.print(f"[red]Error: Config manager not set for Extraction Agent ({section_name}).[/red]")
+             return None
+
         try:
             # Focus on relevant rows based on header detection
             focused_content = self._focus_content(markdown_content, header_info)
@@ -302,9 +654,12 @@ class DynamicExtractionAgent:
             # Display the input for the extraction agent
             console.print(f"[cyan]Extraction Agent Input for {section_name}:[/cyan]")
             
-            # Get or create example messages for this section, passing app_config
-            if section_name not in self.section_messages:
+            # Get or create example messages for this section, using the dynamically set config_manager
+            if section_name not in self.section_messages or not self.section_messages[section_name]:
                 self.section_messages[section_name] = self._create_section_messages(section_name, self.app_config)
+                if not self.section_messages[section_name]: # Check if loading failed
+                     console.print(f"[red]Error: Failed to load messages for {section_name} extraction.[/red]")
+                     return None
                 
             # Extract data
             result = extract_section(
@@ -361,12 +716,17 @@ class DynamicExtractionAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # This method relies on self.config_manager being set
+        if not self.config_manager:
+             console.print(f"[yellow]⚠[/yellow] Cannot create section messages for {section_name} without config manager.")
+             return []
+
         # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
         system_content = load_template_prompt(
             "section_extraction_system_template.md", 
             section_name=section_name,
-            config_manager=self.config_manager,
+            config_manager=self.config_manager, # Use the dynamically set manager
             app_config=app_config
         )
         system_message = {"role": "system", "content": system_content}
@@ -378,20 +738,19 @@ class DynamicExtractionAgent:
 class DynamicValidationAgent:
     """Agent for validating and correcting extracted data using dynamic configuration."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
         """
         Initialize the validation agent.
         
         Args:
             llm: LLM instance to use for validation
-            config_manager: Configuration manager, or None to use default
             app_config: Application configuration instance
         """
         self.llm = llm
-        self.config_manager = config_manager or get_configuration_manager()
+        self.config_manager = None # Initialize as None
         # Store app_config if provided, otherwise load default AppConfig for standalone use
         self.app_config = app_config or AppConfig()
-        self.section_messages = {}  # Initialize empty dictionary for section-specific messages
+        self.section_messages = {}  # Initialize as empty, loaded at runtime
         
     def validate(self, extracted_data: BaseExtraction, markdown_content: str, header_info: ContextModel,
                 section_name: str, model_class: Type[BaseExtraction]) -> Optional[Any]:
@@ -409,7 +768,12 @@ class DynamicValidationAgent:
             Validated data with confidence score, or None if validation failed
         """
         console.print(f"[blue]Validating {section_name} data...[/blue]")
-        
+
+        # Ensure config_manager is set
+        if self.config_manager is None:
+             console.print(f"[red]Error: Config manager not set for Validation Agent ({section_name}).[/red]")
+             return None
+
         try:
             # Focus on relevant rows based on header detection (same as extraction)
             focused_content = self._focus_content(markdown_content, header_info)
@@ -435,9 +799,12 @@ class DynamicValidationAgent:
             # Create validation model class that extends the original
             validation_model = self._create_validation_model(model_class)
             
-            # Get or create example messages for this section, passing app_config
-            if section_name not in self.section_messages:
+            # Get or create example messages for this section, using dynamic config_manager
+            if section_name not in self.section_messages or not self.section_messages[section_name]:
                 self.section_messages[section_name] = self._create_section_validation_messages(section_name, self.app_config)
+                if not self.section_messages[section_name]: # Check if loading failed
+                     console.print(f"[red]Error: Failed to load messages for {section_name} validation.[/red]")
+                     return None
             
             # Validate data using section-specific messages
             result = extract_section(
@@ -513,12 +880,17 @@ class DynamicValidationAgent:
         Returns:
             List of message dictionaries for the LLM
         """
+        # This method relies on self.config_manager being set
+        if not self.config_manager:
+             console.print(f"[yellow]⚠[/yellow] Cannot create section validation messages for {section_name} without config manager.")
+             return []
+
         # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
         system_content = load_template_prompt(
             "section_validation_system_template.md", 
             section_name=section_name,
-            config_manager=self.config_manager,
+            config_manager=self.config_manager, # Use the dynamically set manager
             app_config=app_config
         )
         system_message = {"role": "system", "content": system_content}
@@ -531,31 +903,36 @@ class DynamicValidationAgent:
 class DynamicAgentPipelineCoordinator:
     """Coordinator for the dynamic agent pipeline."""
     
-    def __init__(self, config: AppConfig, config_manager: Optional[ConfigurationManager] = None):
+    def __init__(self, config: AppConfig):
         """
         Initialize the agent pipeline coordinator.
         
         Args:
             config: Application configuration
-            config_manager: Configuration manager, or None to use default
         """
         self.config = config
-        self.config_manager = config_manager or get_configuration_manager(config.config_path)
-        self.llm = configure_llm(config)
+        # Import the new LLM configuration function
+        from .llm import configure_llm, configure_llm_classification 
+
+        # Configure the two LLM instances
+        self.main_llm = configure_llm(config)
+        self.classification_llm = configure_llm_classification(config)
         
-        # Initialize agents with dynamic configuration, passing app_config
-        self.header_agent = DynamicHeaderDetectionAgent(self.llm, self.config_manager)
-        self.header_validation_agent = DynamicHeaderValidationAgent(self.llm, self.config_manager)
-        self.extraction_agent = DynamicExtractionAgent(self.llm, self.config_manager, self.config)
-        self.validation_agent = DynamicValidationAgent(self.llm, self.config_manager, self.config)
-        self.deduplication_agent = DynamicDeduplicationAgent(self.llm, self.config_manager, self.config)
+        # Initialize classification agents with classification LLM and app_config
+        self.classification_agent = DynamicClassificationAgent(self.classification_llm, self.config)
+        self.classification_validation_agent = DynamicClassificationValidationAgent(self.classification_llm, self.config)
+
+        # Initialize other agents with main LLM
+        # Config manager and models will be loaded dynamically in process_markdown
+        self.header_agent = DynamicHeaderDetectionAgent(self.main_llm) 
+        self.header_validation_agent = DynamicHeaderValidationAgent(self.main_llm) 
+        self.extraction_agent = DynamicExtractionAgent(self.main_llm, app_config=self.config) 
+        self.validation_agent = DynamicValidationAgent(self.main_llm, app_config=self.config) 
+        self.deduplication_agent = DynamicDeduplicationAgent(self.main_llm, app_config=self.config) 
         
-        # Get the dynamically configured extraction models
-        # Pass the include_examples flag from AppConfig
-        self.extraction_models = create_extraction_models_dict(
-            self.config_manager, 
-            include_examples=self.config.include_header_examples_in_prompt
-        )
+        # Reset config manager and models - they are loaded conditionally per run
+        self.config_manager = None
+        self.extraction_models = {}
         
     def process_markdown(self, markdown_content: str, source_file: str) -> Dict:
         """
@@ -573,175 +950,220 @@ class DynamicAgentPipelineCoordinator:
         import os
         ordered_results = OrderedDict()
         start_time = time.perf_counter()  # Start timer
-        
-        # Step 1: Detect headers
-        header_info = self.header_agent.detect_headers(markdown_content)
-        
-        # Check if header detection failed
-        if not header_info:
-            console.print("[red]Header detection failed[/red]")
-            return {"error": "header detection failed"}
-        
-        # Step 2: Validate header detection
-        validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
-        
-        # Get validation confidence threshold from config
-        validation_config = self.config_manager.get_validation_config()
-        header_confidence_threshold = validation_config.get('confidence_threshold', 0.7)
-        
-        # Check if header validation failed or has low confidence
-        if not validated_header_info or (hasattr(validated_header_info, 'ValidationConfidence') and 
-                                         validated_header_info.ValidationConfidence < header_confidence_threshold):
-            console.print("[red]Header validation failed or has low confidence[/red]")
-            return {"error": "header detection failed"}
-        
-        # Use validated header info
-        header_info = validated_header_info
-        header_confidence = validated_header_info.ValidationConfidence if hasattr(validated_header_info, 'ValidationConfidence') else 0.7
-        
-        # Extract file information from source_file
-        console.print(f"[blue]Extracting file information from source file: {source_file}[/blue]")
-        FileName = os.path.splitext(os.path.basename(source_file))[0] if source_file else None
-        file_ext = os.path.splitext(source_file)[1].lower() if source_file else None
-        FileType = file_ext.lstrip('.') if file_ext else None
-        console.print(f"[blue]Extracted file info - name: {FileName}, extension: {file_ext}, type: {FileType}[/blue]")
-        
-        # Always create a Context section with header detection information
-        context_data = {
-            "ValidationConfidence": header_confidence,
-            "FileName": FileName,
-            "HeaderStartLine": None,
-            "HeaderEndLine": None,
-            "ContentStartLine": None,
-            "FileType": FileType
-        }
-        
-        # Copy header detection information to Context section
-        if header_info:
-            for field in ["HeaderStartLine", "HeaderEndLine", "ContentStartLine"]:
-                if hasattr(header_info, field) and getattr(header_info, field) is not None:
-                    context_data[field] = getattr(header_info, field)
-        
-        # Add Context section to ordered results first
-        ordered_results["Context"] = context_data
-        
-        # Get validation confidence threshold from config
-        validation_config = self.config_manager.get_validation_config()
-        extraction_confidence_threshold = validation_config.get('confidence_threshold', 0.8)
-        
-        # Step 2: Extract each section
-        results = {}  # Temporary dictionary for extraction results
-        for section_name, model_class in self.extraction_models.items():
-            # Initialize section results
-            results[section_name] = {k: None for k in model_class.model_fields.keys()}
-            
-            # Extract data
-            extracted_data = self.extraction_agent.extract_data(
-                markdown_content, 
-                header_info, 
-                section_name, 
-                model_class
-            )
-            
-            if not extracted_data:
-                console.print(f"[yellow]⚠[/yellow] No data extracted for {section_name}")
-                continue
-                
-            # Step 3: Validate data
-            validated_result = self.validation_agent.validate(
-                extracted_data,
-                markdown_content,
-                header_info,
-                section_name,
-                model_class
-            )
-            
-            # Always use validation output if available, regardless of confidence
-            if validated_result and hasattr(validated_result, 'ValidatedData'):
-                ValidatedData = validated_result.ValidatedData.model_dump()
-                for field, value in ValidatedData.items():
-                    if value is not None:
-                        results[section_name][field] = value
 
-                # Add validation confidence to results
-                if hasattr(validated_result, 'ValidationConfidence'):
-                    results[section_name]['ValidationConfidence'] = validated_result.ValidationConfidence
+        # --- NEW: Classification Steps ---
+        doc_name = os.path.splitext(os.path.basename(source_file))[0] if source_file else "Unknown Document"
+        
+        classification_output = self.classification_agent.run(markdown_content, doc_name)
+        if not classification_output:
+            console.print("[red]Classification failed. Stopping pipeline.[/red]")
+            return {"error": "Classification failed"}
+
+        validation_output = self.classification_validation_agent.run(markdown_content, doc_name, classification_output)
+        if not validation_output:
+            console.print("[red]Classification validation failed. Stopping pipeline.[/red]")
+            return {"error": "Classification validation failed"}
+
+        console.print(f"[blue]Classification Validated:[/blue] Class='{validation_output.predicted_class}', Confidence='{validation_output.confidence}', Reason='{validation_output.validation_reason}'")
+        
+        # Store classification result
+        ordered_results["Classification"] = validation_output.model_dump()
+        
+        # --- Conditional Logic ---
+        validated_class = validation_output.predicted_class
+        if validated_class == "Mutual Funds":
+            # Construct the specific config path
+            config_file_name = f"full_config_{validated_class.replace(' ', '_')}.json" # e.g., full_config_Mutual_Funds.json
+            config_path = os.path.join("config", config_file_name)
+
+            if not os.path.exists(config_path):
+                console.print(f"[red]Error: Config file not found: {config_path}[/red]")
+                # Add timing info before returning error
+                end_time = time.perf_counter()
+                processing_time = end_time - start_time
+                ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
+                return {"error": f"Config file not found for {validated_class}", **ordered_results}
+
+            # Initialize config_manager and models FOR THIS RUN
+            try:
+                # Import here to avoid circular dependency if models.py imports this file later
+                from ..config_manager import get_configuration_manager 
+                from ..dynamic_model_factory import create_extraction_models_dict
+                
+                current_run_config_manager = get_configuration_manager(config_path)
+                current_run_extraction_models = create_extraction_models_dict(
+                    current_run_config_manager,
+                    include_examples=self.config.include_header_examples_in_prompt
+                )
+                # Store them for this run (needed by agents)
+                self.config_manager = current_run_config_manager
+                self.extraction_models = current_run_extraction_models
+
+            except Exception as e:
+                 console.print(f"[red]Error loading config or models from {config_path}: {e}[/red]")
+                 # Add timing info
+                 end_time = time.perf_counter()
+                 processing_time = end_time - start_time
+                 ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
+                 return {"error": f"Failed to load config/models for {validated_class}", **ordered_results}
+
+            console.print(f"[green]Proceeding for '{validated_class}' using '{config_path}'[/green]")
+
+            # --- Existing Pipeline Steps (Modified to use dynamically loaded config) ---
+            
+            # Step: Header Detection 
+            # Pass config manager to agent instance for this run
+            self.header_agent.config_manager = self.config_manager 
+            self.header_agent.messages = self.header_agent._create_example_messages() # Reload messages based on new config
+            header_info = self.header_agent.detect_headers(markdown_content)
+            
+            if not header_info:
+                console.print("[red]Header detection failed[/red]")
+                # Add timing info
+                end_time = time.perf_counter()
+                processing_time = end_time - start_time
+                ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
+                return {"error": "header detection failed", **ordered_results}
+
+            # Step: Header Validation
+            self.header_validation_agent.config_manager = self.config_manager
+            self.header_validation_agent.messages = self.header_validation_agent._create_validation_messages() # Reload messages
+            validated_header_info = self.header_validation_agent.validate(header_info, markdown_content)
+            
+            validation_config = self.config_manager.get_validation_config()
+            header_confidence_threshold = validation_config.get('confidence_threshold', 0.7)
+            
+            if not validated_header_info or (hasattr(validated_header_info, 'ValidationConfidence') and 
+                                             validated_header_info.ValidationConfidence < header_confidence_threshold):
+                console.print("[red]Header validation failed or has low confidence[/red]")
+                # Add timing info
+                end_time = time.perf_counter()
+                processing_time = end_time - start_time
+                ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
+                return {"error": "header validation failed", **ordered_results}
+            
+            header_info = validated_header_info
+            header_confidence = validated_header_info.ValidationConfidence if hasattr(validated_header_info, 'ValidationConfidence') else 0.7
+            
+            # Context Section Setup
+            FileName = doc_name # Already extracted
+            file_ext = os.path.splitext(source_file)[1].lower() if source_file else None
+            FileType = file_ext.lstrip('.') if file_ext else None
+            context_data = {
+                "ValidationConfidence": header_confidence, # Use header validation confidence
+                "FileName": FileName,
+                "HeaderStartLine": getattr(header_info, 'HeaderStartLine', None),
+                "HeaderEndLine": getattr(header_info, 'HeaderEndLine', None),
+                "ContentStartLine": getattr(header_info, 'ContentStartLine', None),
+                "FileType": FileType
+            }
+            ordered_results["Context"] = context_data
+            
+            # Step: Section Extraction & Validation
+            # Pass config manager to agents for this run
+            self.extraction_agent.config_manager = self.config_manager
+            self.validation_agent.config_manager = self.config_manager
+            # Reset messages cache as config changed
+            self.extraction_agent.section_messages = {} 
+            self.validation_agent.section_messages = {} 
+
+            results = {}
+            extraction_confidence_threshold = validation_config.get('confidence_threshold', 0.8)
+            for section_name, model_class in self.extraction_models.items():
+                results[section_name] = {k: None for k in model_class.model_fields.keys() if k != 'ValidationConfidence'} # Init without confidence field
+                
+                extracted_data = self.extraction_agent.extract_data(
+                    markdown_content, header_info, section_name, model_class
+                )
+                
+                if not extracted_data:
+                    console.print(f"[yellow]⚠[/yellow] No data extracted for {section_name}")
+                    results[section_name]['ValidationConfidence'] = 0.0 # Mark as low confidence if extraction failed
+                    continue
+                    
+                validated_result = self.validation_agent.validate(
+                    extracted_data, markdown_content, header_info, section_name, model_class
+                )
+                
+                current_section_confidence = 0.5 # Default if validation fails
+                if validated_result and hasattr(validated_result, 'ValidatedData'):
+                    ValidatedData = validated_result.ValidatedData.model_dump()
+                    for field, value in ValidatedData.items():
+                        if value is not None and field != 'ValidationConfidence':
+                            results[section_name][field] = value
+
+                    if hasattr(validated_result, 'ValidationConfidence'):
+                        current_section_confidence = validated_result.ValidationConfidence
+                        results[section_name]['ValidationConfidence'] = current_section_confidence
+                    else:
+                        results[section_name]['ValidationConfidence'] = 0.9 # Default high if validation worked but no score
+
+                    console.print(f"[green]✓[/green] Used validated {section_name} (confidence {results[section_name]['ValidationConfidence']:.2f})")
+                    if hasattr(validated_result, 'CorrectionsMade') and validated_result.CorrectionsMade:
+                        console.print(f"[blue]Corrections made:[/blue]")
+                        for correction in validated_result.CorrectionsMade: console.print(f"  • {correction}")
                 else:
-                    results[section_name]['ValidationConfidence'] = 0.9  # Default if missing
+                    console.print(f"[yellow]⚠[/yellow] Validation failed for {section_name}, using original extraction")
+                    result_data = extracted_data.model_dump()
+                    for field, value in result_data.items():
+                        if value is not None and field != 'ValidationConfidence':
+                            results[section_name][field] = value
+                    results[section_name]['ValidationConfidence'] = current_section_confidence # Keep default 0.5
 
-                console.print(f"[green]✓[/green] Used validated {section_name} (confidence {results[section_name]['ValidationConfidence']:.2f})")
+            # Add extraction results to ordered results
+            for section_name, section_data in results.items():
+                ordered_results[section_name] = section_data
+            
+            # Step: Deduplication
+            if self.config.enable_deduplication_agent:
+                # Pass config manager for this run
+                self.deduplication_agent.config_manager = self.config_manager 
+                console.print("[blue]Running deduplication agent to resolve header conflicts...[/blue]")
+                deduplication_result = self.deduplication_agent.deduplicate(
+                    ordered_results, markdown_content
+                )
+                
+                if deduplication_result and "DeduplicatedData" in deduplication_result:
+                    deduplicated_data = deduplication_result["DeduplicatedData"]
+                    for section_name, section_data in deduplicated_data.items():
+                        if section_name in ordered_results:
+                            ordered_results[section_name] = section_data
+                    console.print(f"[green]✓[/green] Successfully deduplicated extraction results with confidence {deduplication_result.get('DeduplicationConfidence', 0.0):.2f}")
+                    # Note: ConflictsResolved logging removed as per previous user request
+                else:
+                    console.print("[yellow]⚠[/yellow] Deduplication failed, using original extraction results")
 
-                # Log corrections if any
-                if hasattr(validated_result, 'CorrectionsMade') and validated_result.CorrectionsMade:
-                    console.print(f"[blue]Corrections made:[/blue]")
-                    for correction in validated_result.CorrectionsMade:
-                        console.print(f"  • {correction}")
-            else:
-                # Use original extraction only if validation completely failed
-                console.print(f"[yellow]⚠[/yellow] Validation failed for {section_name}, using original extraction")
-                result_data = extracted_data.model_dump()
-                for field, value in result_data.items():
-                    if value is not None:
-                        results[section_name][field] = value
+        else: # Not Mutual Funds
+            console.print(f"[yellow]Skipping extraction for class: '{validated_class}'[/yellow]")
+            # Add timing info and return early
+            end_time = time.perf_counter()
+            processing_time = end_time - start_time
+            ordered_results["ProcessingTimeSeconds"] = round(processing_time, 3)
+            console.print(f"[cyan]Total processing time (skipped extraction): {processing_time:.3f} seconds[/cyan]")
+            return ordered_results 
 
-                # Add a default confidence
-                results[section_name]['ValidationConfidence'] = 0.5
+        # --- Final processing for the successful Mutual Funds case ---
+        end_time = time.perf_counter()
+        processing_time = end_time - start_time
         
-        # Add extraction results to ordered results
-        for section_name, section_data in results.items():
-            ordered_results[section_name] = section_data
-        
-        # Step 4: Run deduplication agent if enabled
-        if self.config.enable_deduplication_agent:
-            console.print("[blue]Running deduplication agent to resolve header conflicts...[/blue]")
+        # Ensure Context exists before adding time
+        if "Context" not in ordered_results or ordered_results["Context"] is None:
+             ordered_results["Context"] = {} # Create if missing
+        ordered_results["Context"]["ProcessingTimeSeconds"] = round(processing_time, 3)
             
-            # Run deduplication
-            deduplication_result = self.deduplication_agent.deduplicate(
-                ordered_results,
-                markdown_content
-            )
-            
-            # Use deduplicated results
-            if deduplication_result and "DeduplicatedData" in deduplication_result:
-                deduplicated_data = deduplication_result["DeduplicatedData"]
-                
-                # Update ordered_results with deduplicated data
-                for section_name, section_data in deduplicated_data.items():
-                    if section_name in ordered_results:
-                        ordered_results[section_name] = section_data
-                
-                console.print(f"[green]✓[/green] Successfully deduplicated extraction results with confidence {deduplication_result.get('DeduplicationConfidence', 0.0):.2f}")
-                
-                # Display conflicts that were resolved
-                if "ConflictsResolved" in deduplication_result:
-                    console.print("Conflicts resolved:")
-                    for conflict in deduplication_result["ConflictsResolved"]:
-                        console.print(f"  • {conflict}")
-            else:
-                console.print("[yellow]⚠[/yellow] Deduplication failed, using original extraction results")
-            
-        end_time = time.perf_counter()  # End timer
-        processing_time = end_time - start_time  # Calculate duration
-        
-        # Add processing time to context data
-        if "Context" in ordered_results:
-            ordered_results["Context"]["ProcessingTimeSeconds"] = round(processing_time, 3)
-            
-        # Print processing time to console
         console.print(f"[cyan]Total processing time for {source_file}: {processing_time:.3f} seconds[/cyan]")
-        
         return ordered_results
 
 
 class DynamicDeduplicationAgent:
     """Agent for resolving header conflicts between extraction models."""
     
-    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
+    def __init__(self, llm, app_config: Optional[AppConfig] = None): # Removed config_manager
         """Initialize the deduplication agent."""
         self.llm = llm
-        self.config_manager = config_manager or get_configuration_manager()
+        self.config_manager = None # Initialize as None
         self.app_config = app_config or AppConfig()
-        self.messages = self._create_deduplication_messages()
+        self.messages = self._create_deduplication_messages() # Keep loading concise system prompt here
         
     def deduplicate(self, extraction_results: Dict, markdown_content: str) -> Dict:
         """
@@ -754,9 +1176,17 @@ class DynamicDeduplicationAgent:
         Returns:
             Deduplicated extraction results
         """
+        # Ensure config_manager is set
+        if self.config_manager is None:
+             console.print("[red]Error: Config manager not set for Deduplication Agent.[/red]")
+             return None
+             
         try:
-            # Get the Pydantic model definitions from config
+            # Get the Pydantic model definitions from config (uses self.config_manager)
             pydantic_models = self._get_pydantic_models()
+            if not pydantic_models: # Check if loading failed
+                 console.print("[red]Error: Failed to get Pydantic models for deduplication.[/red]")
+                 return None
             
             # Convert inputs to formatted strings for the LLM
             extraction_json = json.dumps(extraction_results, indent=2)
@@ -903,6 +1333,11 @@ class DynamicDeduplicationAgent:
         Returns:
             Dictionary containing all model definitions from config/full_config.json
         """
+        # This method relies on self.config_manager being set
+        if not self.config_manager:
+             console.print("[yellow]⚠[/yellow] Cannot get pydantic models without config manager.")
+             return {}
+
         # Get the extraction models configuration
         extraction_models_config = self.config_manager.get_extraction_models()
         
