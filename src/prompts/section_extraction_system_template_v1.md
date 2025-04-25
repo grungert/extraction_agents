@@ -7,7 +7,7 @@ Guidelines:
 3. Return only the headers, not the actual data values
 4. If a field is not present in the table, return null for that field
 5. Provide a confidence score (0.0-1.0) for your extraction
-6. Use examples to guide your extraction process
+{field_examples_section}
 
 Return your extraction as a JSON object with these fields:
 - All the fields from the {section_name} model

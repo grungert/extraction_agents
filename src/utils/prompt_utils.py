@@ -91,7 +91,7 @@ def load_template_prompt(
                  if "extraction" in file_name:
                      examples_header = "6. Example headers to look for:"
                  elif "validation" in file_name:
-                     examples_header = "7. Expected fields and example headers:"
+                     examples_header = "6. Expected fields and example headers:"
                  else:
                      examples_header = "Field Examples:" # Default header
                  # Construct the final text block with header and formatted lines

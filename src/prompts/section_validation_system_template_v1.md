@@ -12,7 +12,7 @@ Guidelines:
 3. Correct any issues found (e.g., wrong mappings, formatting, capitalization, etc.)
 4. Provide a confidence score (0.0-1.0) for your validation
 5. List any corrections you made
-6. Use examples to guide your validation process
+{field_examples_section}
 
 Return your validation as a JSON object with these fields:
 - ValidatedData: The corrected data with all {section_name} fields

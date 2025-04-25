@@ -4,6 +4,10 @@ json_outputs/
 ground-truth/
 input/
 mine2test/
+venv/
+__pycache__/
+.vscode/
+.venv/
 
 .DS_Store
 

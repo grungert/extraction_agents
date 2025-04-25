@@ -94,7 +94,7 @@ class DynamicHeaderValidationAgent:
         from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": load_prompt("header_validation_system.md")
+            "content": load_prompt("header_validation_system_v1.md")
         }
         
         # Load header examples from configuration manager
@@ -194,7 +194,7 @@ class DynamicHeaderDetectionAgent:
         from ..utils.prompt_utils import load_prompt
         system_message = {
             "role": "system",
-            "content": load_prompt("header_detection_system.md")
+            "content": load_prompt("header_detection_system_v1.md")
         }
         
         # Load header examples from configuration manager
