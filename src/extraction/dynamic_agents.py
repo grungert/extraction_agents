@@ -164,8 +164,6 @@ class DynamicClassificationAgent:
             else:
                  raise ValueError(f"Unexpected LLM response type: {type(llm_response)}")
 
-            console.print(f"[dim]Classification LLM Raw Response: {llm_response_text}[/dim]")
-
             parsed_data = self._parse_response(llm_response_text)
 
             if "error" in parsed_data:
@@ -306,8 +304,6 @@ class DynamicClassificationValidationAgent:
             else:
                  raise ValueError(f"Unexpected LLM response type: {type(llm_response)}")
 
-            console.print(f"[dim]Validation LLM Raw Response: {llm_response_text}[/dim]")
-
             parsed_data = self._parse_response(llm_response_text)
 
             if "error" in parsed_data:
@@ -418,11 +414,12 @@ class DynamicHeaderValidationAgent:
         # Get header validation configuration
         validation_config = self.config_manager.get_validation_config()
         
-        # Load system message from prompt file
+        # Load system message from prompt file using config manager
         from ..utils.prompt_utils import load_prompt
+        prompt_filename = self.config_manager.get_header_validation_prompt_file()
         system_message = {
             "role": "system",
-            "content": load_prompt("header_validation_system_v1.md") # Consider making prompt name configurable?
+            "content": load_prompt(prompt_filename) 
         }
         
         # Load header examples from configuration manager
@@ -534,11 +531,12 @@ class DynamicHeaderDetectionAgent:
         # Get header detection configuration
         header_config = self.config_manager.get_header_detection_config()
         
-        # Load system message from prompt file
+        # Load system message from prompt file using config manager
         from ..utils.prompt_utils import load_prompt
+        prompt_filename = self.config_manager.get_header_detection_prompt_file()
         system_message = {
             "role": "system",
-            "content": load_prompt("header_detection_system_v1.md") # Consider making prompt name configurable?
+            "content": load_prompt(prompt_filename) 
         }
         
         # Load header examples from configuration manager
@@ -719,8 +717,9 @@ class DynamicExtractionAgent:
 
         # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
+        template_filename = self.config_manager.get_section_extraction_template_file()
         system_content = load_template_prompt(
-            "section_extraction_system_template.md", 
+            template_filename, 
             section_name=section_name,
             config_manager=self.config_manager, # Use the dynamically set manager
             app_config=app_config
@@ -883,8 +882,9 @@ class DynamicValidationAgent:
 
         # Load system message template from prompt file, passing necessary context
         from ..utils.prompt_utils import load_template_prompt
+        template_filename = self.config_manager.get_section_validation_template_file()
         system_content = load_template_prompt(
-            "section_validation_system_template.md", 
+            template_filename, 
             section_name=section_name,
             config_manager=self.config_manager, # Use the dynamically set manager
             app_config=app_config
@@ -1164,7 +1164,7 @@ class DynamicDeduplicationAgent:
         self.llm = llm
         self.config_manager = None # Initialize as None
         self.app_config = app_config or AppConfig()
-        self.messages = self._create_deduplication_messages() # Keep loading concise system prompt here
+        self.messages = [] # Initialize as empty, load at runtime
         
     def deduplicate(self, extraction_results: Dict, markdown_content: str) -> Dict:
         """
@@ -1193,9 +1193,10 @@ class DynamicDeduplicationAgent:
             extraction_json = json.dumps(extraction_results, indent=2)
             models_json = json.dumps(pydantic_models, indent=2)
             
-            # Load detailed instructions (ROLE, OBJECTIVE, etc.)
+            # Load detailed instructions (ROLE, OBJECTIVE, etc.) using config manager
             from ..utils.prompt_utils import load_prompt
-            detailed_instructions = load_prompt("deduplication_agent.md")
+            instruction_prompt_filename = self.config_manager.get_deduplication_instruction_prompt_file()
+            detailed_instructions = load_prompt(instruction_prompt_filename)
 
             # Prepare JSON string inputs with ```json blocks
             extraction_json_str = f"```json\n{json.dumps(extraction_results, indent=2)}\n```"
@@ -1220,13 +1221,20 @@ class DynamicDeduplicationAgent:
             # Use the extract_section function for consistency
             from .llm import extract_section
             
+            # Load messages if not already loaded for this run
+            if not self.messages:
+                 self.messages = self._create_deduplication_messages()
+                 if not self.messages: # Check if loading failed
+                      console.print("[red]Error: Failed to load messages for Deduplication.[/red]")
+                      return None
+
             # Call extract_section with the structured messages
-            # self.messages contains the concise system prompt loaded in __init__
+            # self.messages now contains the concise system prompt loaded just-in-time
             response = extract_section(
                 markdown_content=user_message_content, # This is the detailed user message
                 section_name="Deduplication",
                 model_class=DeduplicationResult,
-                messages=self.messages, # Contains concise system prompt
+                messages=self.messages, 
                 llm=self.llm
             )
             
@@ -1358,9 +1366,16 @@ class DynamicDeduplicationAgent:
         
     def _create_deduplication_messages(self) -> List[Dict]:
         """Create example messages for deduplication."""
-        # Load the concise system message from the new prompt file
+        # Load the concise system message from the prompt file specified in config
+        # Assumes self.config_manager is set before this is called
         from ..utils.prompt_utils import load_prompt
-        system_content = load_prompt("deduplication_system.md") # Load from new file
+        prompt_filename = self.config_manager.get_deduplication_system_prompt_file()
+        try:
+            system_content = load_prompt(prompt_filename) 
+        except FileNotFoundError:
+             console.print(f"[red]Error: Deduplication system prompt file '{prompt_filename}' not found.[/red]")
+             return [] # Return empty list on error
+             
         system_message = {"role": "system", "content": system_content}
         
         # For now, we don't include examples as this is a new agent

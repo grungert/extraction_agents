@@ -14,8 +14,8 @@ from langchain_core.messages import (
 from ..utils.display import console
 from ..models import (
     AppConfig, 
-    Example,
-    EXTRACTION_MODELS
+    Example
+    # EXTRACTION_MODELS removed as it's loaded dynamically now
 )
 from ..config_manager import get_configuration_manager
 from ..dynamic_model_factory import create_extraction_models_dict

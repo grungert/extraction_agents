@@ -92,22 +92,6 @@ class Example(TypedDict):
     input: str  # This is the example text
     tool_calls: List[Any]  # Instances of pydantic model that should be extracted
 
-# Get dynamic models from config
-try:
-    from .config_manager import get_configuration_manager
-    from .dynamic_model_factory import create_extraction_models_dict
-    
-    # Get configuration manager
-    config_manager = get_configuration_manager()
-    
-    # Load dynamic models, passing the flag from AppConfig
-    # Create a default AppConfig instance to access the flag if not otherwise available
-    app_config_instance = AppConfig()
-    EXTRACTION_MODELS = create_extraction_models_dict(
-        config_manager, 
-        include_examples=app_config_instance.include_header_examples_in_prompt
-    )
-except Exception as e:
-    # Fall back to empty dictionary if loading fails
-    print(f"Error loading dynamic models: {str(e)}")
-    EXTRACTION_MODELS = {}
+# NOTE: EXTRACTION_MODELS are now loaded dynamically within the 
+# DynamicAgentPipelineCoordinator based on classification results,
+# so the module-level loading has been removed.

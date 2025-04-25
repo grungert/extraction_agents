@@ -134,7 +134,37 @@ class ConfigurationManager:
         """
         return self.config.get("validation", {})
         
-    
+    def get_prompts_config(self) -> Dict[str, str]:
+        """Get the prompts configuration section."""
+        return self.config.get('prompts', {})
+
+    def get_header_detection_prompt_file(self) -> str:
+        """Get the filename for the header detection system prompt."""
+        # Provide a default fallback if not specified in config
+        return self.get_prompts_config().get('header_detection_system_prompt_file', 'header_detection_system_v1.md') 
+
+    def get_header_validation_prompt_file(self) -> str:
+        """Get the filename for the header validation system prompt."""
+        # Provide a default fallback if not specified in config
+        # Note: Moved this getter here from validation config for consistency
+        return self.get_validation_config().get('header_validation_prompt_file', 'header_validation_system_v1.md')
+
+    def get_deduplication_system_prompt_file(self) -> str:
+        """Get the filename for the deduplication system prompt."""
+        return self.get_prompts_config().get('deduplication_system_prompt_file', 'deduplication_system.md')
+
+    def get_deduplication_instruction_prompt_file(self) -> str:
+        """Get the filename for the deduplication instruction prompt."""
+        return self.get_prompts_config().get('deduplication_instruction_prompt_file', 'deduplication_agent.md')
+        
+    def get_section_extraction_template_file(self) -> str:
+        """Get the filename for the section extraction template."""
+        return self.get_prompts_config().get('section_extraction_template_file', 'section_extraction_system_template.md')
+
+    def get_section_validation_template_file(self) -> str:
+        """Get the filename for the section validation template."""
+        return self.get_prompts_config().get('section_validation_template_file', 'section_validation_system_template.md')
+
     def get_extraction_models(self) -> List[Dict[str, Any]]:
         """
         Get the extraction model definitions.
@@ -196,19 +226,26 @@ class ConfigurationManager:
         return model.get("examples", [])
 
 
-def get_configuration_manager(config_path: Optional[str] = None) -> ConfigurationManager:
+def get_configuration_manager(config_path: str) -> ConfigurationManager: # Made config_path non-optional
     """
     Get a configuration manager instance.
     
     Args:
-        config_path: Path to the configuration file, or None to use the default path
+        config_path: Path to the configuration file (required)
         
     Returns:
         ConfigurationManager instance
+        
+    Raises:
+        ValueError: If config_path is None (though type hint prevents this)
+        FileNotFoundError: If the specified config_path does not exist
     """
-    if config_path is None:
-        # Use the default path
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config_path = os.path.join(base_dir, "config", "full_config.json")
+    if config_path is None: 
+        # This check is technically redundant due to type hint, but good practice
+        raise ValueError("Configuration path must be provided to get_configuration_manager.")
     
+    # Check if path exists before creating manager 
+    if not os.path.exists(config_path):
+         raise FileNotFoundError(f"Configuration file specified does not exist: {config_path}")
+
     return ConfigurationManager(config_path)

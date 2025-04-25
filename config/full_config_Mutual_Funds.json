@@ -400,6 +400,14 @@
     }
   ],
   "validation": {
-    "confidence_threshold": 0.8
+    "confidence_threshold": 0.8,
+    "header_validation_prompt_file": "header_validation_system_v1.md" 
+  },
+  "prompts": {
+    "header_detection_system_prompt_file": "header_detection_system_v1.md",
+    "deduplication_system_prompt_file": "deduplication_system.md",
+    "deduplication_instruction_prompt_file": "deduplication_agent.md",
+    "section_extraction_template_file": "section_extraction_system_template.md",
+    "section_validation_template_file": "section_validation_system_template.md"
   }
 }
