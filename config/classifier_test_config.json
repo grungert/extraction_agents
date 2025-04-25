@@ -1,0 +1,19 @@
+{
+  "llms_to_test": ["mistral-7b-instruct-v0.3", "llama-3.2-3b-instruct", "claude2-alpaca-7b"],
+  "list_algo": ["mistral-7b-instruct-v0.3", "llama-3.2-3b-instruct", "claude2-alpaca-7b", "gli"],
+  "lm_studio_url": "http://localhost:1234",
+  "base_document_path": "C:/Users/SuneyToste/Flows_Suney/",
+  "base_label_path": "C:/Users/SuneyToste/Test_Suney/",
+  "prediction_file": "predictions.dat",
+  "optimizing_percent_file": "optimization.dat",
+  "gliclass_model": "knowledgator/gliclass-modern-base-v2.0-init",
+  "labels": ["Mutual Funds", "ETF", "Stocks", "Bonds", "Real State", "Crypto Asset", "Commodities", "Private Equities", "Index", "Currencies Pairs", "None of those"],
+  "f1_average": "weighted",
+  "llm_temperature": 0.3,
+  "llm_max_tokens": 4000,
+  "prompt_file": ["classifier_agent_v1.md", "classifier_agent_v2.md", "classifier_agent_v3.md"],
+  "llm_windows_frame_percent": [0.45],
+  "llm_choosen4classification": "claude2-alpaca-7b",
+  "prompt_choosen4classification": "classifier_agent_v2_2.md",
+  "prompt_choosen4valid_classif": "classifier_validation_agent_v1.md"
+}

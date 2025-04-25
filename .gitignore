@@ -3,8 +3,12 @@ Fluxs - AI Training/
 json_outputs/
 ground-truth/
 input/
+mine2test/
 
 .DS_Store
 
 # Environment variables
 .env
+.dat
+idyllic-analyst-450622-e6-96309f404b65.json
+labe lization_agent1.py
