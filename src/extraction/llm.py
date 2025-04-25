@@ -76,24 +76,11 @@ def create_extraction_prompt(section_name=None):
     Returns:
         ChatPromptTemplate: Configured prompt template
     """
-    # Customize based on whether we're extracting a specific section
-    section_text = f"the {section_name} section" if section_name else "a structured JSON output"
-    section_focus = f"that correspond to the {section_name} section" if section_name else "in the given input table"
-    
+    # Create a template structure with placeholders for system, examples, and human messages
     return ChatPromptTemplate.from_messages([
-        ("system", 
-         f"""You are an expert data extraction algorithm. Your task is to map the column headers from an Excel table to the corresponding fields in {section_text}.  
-
-### Instructions:  
-- Identify the column headers {section_focus}.
-- Match each header to the corresponding attribute in the JSON output.
-- Extract only relevant data under each header and assign it to the correct JSON field.
-- If a required value is missing or unavailable, return `null` for that field.
-- Ensure accuracy by strictly following the column-to-attribute mapping.
-"""
-        ),
-        MessagesPlaceholder("examples"),
-        ("human", "{text}"),
+        MessagesPlaceholder(variable_name="system_message"), # Placeholder for system message
+        MessagesPlaceholder(variable_name="examples"),      # Placeholder for examples
+        ("human", "{text}")                                # Placeholder for user text (human input)
     ])
 
 def tool_example_to_messages(example: Example) -> List[BaseMessage]:
@@ -138,6 +125,95 @@ def tool_example_to_messages(example: Example) -> List[BaseMessage]:
 
 # initialize_llm_pipeline function removed - not used by the dynamic pipeline
 
+def call_llm_with_json_response(prompt, model_class, llm):
+    """
+    Call the LLM directly with a prompt and parse the JSON response.
+    
+    Args:
+        prompt (str): The complete prompt to send to the LLM
+        model_class (Type): Pydantic model class for the expected response
+        llm (ChatOpenAI): Configured LLM instance
+        
+    Returns:
+        model_class instance or None: Parsed response or None if parsing failed
+    """
+    # Create a trace for this call if Langfuse is enabled
+    trace_id = None
+    if hasattr(llm, 'callbacks') and llm.callbacks:
+        for callback in llm.callbacks:
+            if hasattr(callback, 'create_trace'):
+                try:
+                    trace = callback.create_trace(
+                        name="direct_llm_call",
+                        metadata={
+                            "model_class": model_class.__name__
+                        }
+                    )
+                    trace_id = trace.id
+                except Exception as e:
+                    console.print(f"[yellow]⚠[/yellow] Failed to create Langfuse trace: {str(e)}")
+    
+    try:
+        # Create a direct message to the LLM
+        message = HumanMessage(content=prompt)
+        
+        # Create a runnable specifically for this model
+        direct_runnable = llm.with_structured_output(
+            schema=model_class,
+            include_raw=False,
+        )
+        
+        # Run the extraction
+        result = direct_runnable.invoke([message])
+        
+        # Validate the result structure
+        if not hasattr(result, 'model_dump'):
+            # End trace with error if it exists
+            if trace_id:
+                for callback in llm.callbacks:
+                    if hasattr(callback, 'update_trace'):
+                        try:
+                            callback.update_trace(
+                                trace_id=trace_id,
+                                status="error",
+                                metadata={"error": "Invalid result structure"}
+                            )
+                        except Exception:
+                            pass
+            return None
+        
+        # End trace with success if it exists
+        if trace_id:
+            for callback in llm.callbacks:
+                if hasattr(callback, 'update_trace'):
+                    try:
+                        callback.update_trace(
+                            trace_id=trace_id,
+                            status="success"
+                        )
+                    except Exception:
+                        pass
+            
+        return result
+        
+    except Exception as e:
+        # Log error to trace if it exists
+        if trace_id:
+            for callback in llm.callbacks:
+                if hasattr(callback, 'update_trace'):
+                    try:
+                        callback.update_trace(
+                            trace_id=trace_id,
+                            status="error",
+                            metadata={"error": str(e)}
+                        )
+                    except Exception:
+                        pass
+        
+        console.print(f"[red]Error in direct LLM call: {str(e)}[/red]")
+        return None
+
+
 def extract_section(markdown_content, section_name, model_class, messages, llm):
     """
     Extract a specific section using a specific model.
@@ -179,13 +255,33 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
             include_raw=False,
         )
         
+        # Extract system message and examples from the input 'messages' list
+        system_prompt_obj = None
+        example_messages = []
+        if messages:
+            if messages[0]['role'] == 'system':
+                # Import SystemMessage if not already imported
+                from langchain_core.messages import SystemMessage
+                system_prompt_obj = SystemMessage(content=messages[0]['content'])
+                example_messages = messages[1:] # The rest are examples
+            else: # Assume no system message provided, all are examples
+                example_messages = messages
+                
+        # Prepare invocation dictionary
+        invoke_input = {
+            "text": markdown_content, # This is the user/human message content
+            "examples": example_messages
+        }
+        # Add system message to input if it exists
+        if system_prompt_obj:
+            invoke_input["system_message"] = [system_prompt_obj]
+        else:
+            # Provide a default minimal system message if none was in messages
+            from langchain_core.messages import SystemMessage
+            invoke_input["system_message"] = [SystemMessage(content="You are a helpful assistant.")]
+
         # Run the extraction
-        result = section_runnable.invoke(
-            {
-                "text": markdown_content,
-                "examples": messages,
-            }
-        )
+        result = section_runnable.invoke(invoke_input)
         
         # Validate the result structure
         if not hasattr(result, 'model_dump'):

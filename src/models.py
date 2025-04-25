@@ -10,7 +10,7 @@ class ModelConfig(BaseModel):
     model_name: str = "llama-3.2-3b-instruct"
     base_url: str = "http://localhost:1234/v1"
     api_key: str = "null"
-    temperature: float = 0.3
+    temperature: float = 0.2
     max_retries: int = 2
 
 class AppConfig(BaseModel):
@@ -23,6 +23,7 @@ class AppConfig(BaseModel):
     model: ModelConfig = ModelConfig()
     config_path: str = "config/full_config.json"
     include_header_examples_in_prompt: bool = True
+    enable_deduplication_agent: bool = True
 
 # Extraction models - base class
 class BaseExtraction(BaseModel):

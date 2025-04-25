@@ -84,6 +84,8 @@ curl -X POST "http://localhost:8000/extract" \
 
 * **Ground truth status**
 
+* **Add ollama integration**
+
 * **Agent csv to markdown table**
     * Create agent if csv dont have table infor to convert table to markdown  
 

@@ -301,7 +301,6 @@ class DynamicExtractionAgent:
             
             # Display the input for the extraction agent
             console.print(f"[cyan]Extraction Agent Input for {section_name}:[/cyan]")
-            console.print(focused_content[:500] + "..." if len(focused_content) > 500 else focused_content)
             
             # Get or create example messages for this section, passing app_config
             if section_name not in self.section_messages:
@@ -549,6 +548,7 @@ class DynamicAgentPipelineCoordinator:
         self.header_validation_agent = DynamicHeaderValidationAgent(self.llm, self.config_manager)
         self.extraction_agent = DynamicExtractionAgent(self.llm, self.config_manager, self.config)
         self.validation_agent = DynamicValidationAgent(self.llm, self.config_manager, self.config)
+        self.deduplication_agent = DynamicDeduplicationAgent(self.llm, self.config_manager, self.config)
         
         # Get the dynamically configured extraction models
         # Pass the include_examples flag from AppConfig
@@ -690,6 +690,35 @@ class DynamicAgentPipelineCoordinator:
         # Add extraction results to ordered results
         for section_name, section_data in results.items():
             ordered_results[section_name] = section_data
+        
+        # Step 4: Run deduplication agent if enabled
+        if self.config.enable_deduplication_agent:
+            console.print("[blue]Running deduplication agent to resolve header conflicts...[/blue]")
+            
+            # Run deduplication
+            deduplication_result = self.deduplication_agent.deduplicate(
+                ordered_results,
+                markdown_content
+            )
+            
+            # Use deduplicated results
+            if deduplication_result and "DeduplicatedData" in deduplication_result:
+                deduplicated_data = deduplication_result["DeduplicatedData"]
+                
+                # Update ordered_results with deduplicated data
+                for section_name, section_data in deduplicated_data.items():
+                    if section_name in ordered_results:
+                        ordered_results[section_name] = section_data
+                
+                console.print(f"[green]✓[/green] Successfully deduplicated extraction results with confidence {deduplication_result.get('DeduplicationConfidence', 0.0):.2f}")
+                
+                # Display conflicts that were resolved
+                if "ConflictsResolved" in deduplication_result:
+                    console.print("Conflicts resolved:")
+                    for conflict in deduplication_result["ConflictsResolved"]:
+                        console.print(f"  • {conflict}")
+            else:
+                console.print("[yellow]⚠[/yellow] Deduplication failed, using original extraction results")
             
         end_time = time.perf_counter()  # End timer
         processing_time = end_time - start_time  # Calculate duration
@@ -702,6 +731,206 @@ class DynamicAgentPipelineCoordinator:
         console.print(f"[cyan]Total processing time for {source_file}: {processing_time:.3f} seconds[/cyan]")
         
         return ordered_results
+
+
+class DynamicDeduplicationAgent:
+    """Agent for resolving header conflicts between extraction models."""
+    
+    def __init__(self, llm, config_manager: Optional[ConfigurationManager] = None, app_config: Optional[AppConfig] = None):
+        """Initialize the deduplication agent."""
+        self.llm = llm
+        self.config_manager = config_manager or get_configuration_manager()
+        self.app_config = app_config or AppConfig()
+        self.messages = self._create_deduplication_messages()
+        
+    def deduplicate(self, extraction_results: Dict, markdown_content: str) -> Dict:
+        """
+        Resolve conflicts where multiple fields map to the same header cell.
+        
+        Args:
+            extraction_results: Combined results from all extraction agents
+            markdown_content: Original markdown table content
+            
+        Returns:
+            Deduplicated extraction results
+        """
+        try:
+            # Get the Pydantic model definitions from config
+            pydantic_models = self._get_pydantic_models()
+            
+            # Convert inputs to formatted strings for the LLM
+            extraction_json = json.dumps(extraction_results, indent=2)
+            models_json = json.dumps(pydantic_models, indent=2)
+            
+            # Load detailed instructions (ROLE, OBJECTIVE, etc.)
+            from ..utils.prompt_utils import load_prompt
+            detailed_instructions = load_prompt("deduplication_agent.md")
+
+            # Prepare JSON string inputs with ```json blocks
+            extraction_json_str = f"```json\n{json.dumps(extraction_results, indent=2)}\n```"
+            conflicts = self._identify_conflicts(extraction_results)
+            conflicts_json_str = f"```json\n{json.dumps(conflicts, indent=2)}\n```"
+
+            # Construct the user message content
+            user_message_content = f"{detailed_instructions}\n\n# Original Table\n{markdown_content}\n\n# Extracted Data\n{extraction_json_str}\n\n# Identified Conflicts\n{conflicts_json_str}"
+
+            # Create a detailed schema for the DeduplicatedData property
+            # This will include all field definitions from the extraction models
+            detailed_schema = self._create_detailed_schema(pydantic_models)
+            
+            # Create a validation model class for the output with detailed schema
+            from pydantic import create_model, Field
+            DeduplicationResult = create_model(
+                "DeduplicationResult",
+                DeduplicatedData=(Dict, Field(..., description="Deduplicated data with resolved conflicts", json_schema_extra=detailed_schema)),
+                DeduplicationConfidence=(float, Field(..., description="Confidence score for deduplication (0.0-1.0)"))
+            )
+            
+            # Use the extract_section function for consistency
+            from .llm import extract_section
+            
+            # Call extract_section with the structured messages
+            # self.messages contains the concise system prompt loaded in __init__
+            response = extract_section(
+                markdown_content=user_message_content, # This is the detailed user message
+                section_name="Deduplication",
+                model_class=DeduplicationResult,
+                messages=self.messages, # Contains concise system prompt
+                llm=self.llm
+            )
+            
+            # Return deduplicated results if successful
+            if response and hasattr(response, "DeduplicatedData"):
+                return response.model_dump()
+            else:
+                console.print("[yellow]⚠[/yellow] Deduplication failed to return valid data")
+                return None
+                
+        except Exception as e:
+            console.print(f"[red]Error in deduplication: {str(e)}[/red]")
+            return None
+            
+    def _create_detailed_schema(self, pydantic_models: Dict) -> Dict:
+        """
+        Create a detailed schema for the DeduplicatedData property.
+        
+        Args:
+            pydantic_models: Dictionary containing model definitions
+            
+        Returns:
+            Dictionary containing detailed schema for DeduplicatedData
+        """
+        # Create a schema that includes all field definitions
+        schema = {
+            "properties": {},
+            "additionalProperties": True,
+            "type": "object"
+        }
+        
+        # Add properties for each model and its fields
+        for model_name, model_info in pydantic_models.items():
+            model_schema = {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": True,
+                "description": model_info.get("description", "")
+            }
+            
+            # Add properties for each field in the model
+            for field_name, field_info in model_info.get("fields", {}).items():
+                field_schema = {
+                    "anyOf": [
+                        {"type": field_info.get("type", "string")},
+                        {"type": "null"}
+                    ],
+                    "default": None,
+                    "description": field_info.get("description", "")
+                }
+                
+                # Add examples if available
+                if "examples" in field_info:
+                    field_schema["examples"] = field_info["examples"]
+                
+                model_schema["properties"][field_name] = field_schema
+            
+            schema["properties"][model_name] = model_schema
+        
+        return schema
+            
+    def _identify_conflicts(self, extraction_results: Dict) -> List[Dict]:
+        """
+        Identify headers that are mapped to multiple fields across different models.
+        
+        Args:
+            extraction_results: Combined results from all extraction agents
+            
+        Returns:
+            List of dictionaries containing header and conflicting fields
+        """
+        # Create a map of header -> list of model.field references
+        header_mappings = {}
+        
+        # Scan through all models and their fields
+        for model_name, model_data in extraction_results.items():
+            if model_name == "Context" or not isinstance(model_data, dict):
+                continue
+                
+            # Skip ValidationConfidence field
+            for field_name, field_value in model_data.items():
+                if field_name == "ValidationConfidence" or field_value is None:
+                    continue
+                    
+                # Add this model.field to the list of mappings for this header
+                if field_value not in header_mappings:
+                    header_mappings[field_value] = []
+                header_mappings[field_value].append(f"{model_name}.{field_name}")
+        
+        # Extract only the headers with multiple mappings (conflicts)
+        conflicts = []
+        for header, mappings in header_mappings.items():
+            if len(mappings) > 1:
+                conflicts.append({
+                    "header": header,
+                    "conflicts": mappings
+                })
+        
+        return conflicts
+        
+    def _get_pydantic_models(self) -> Dict:
+        """
+        Extract Pydantic model definitions from the configuration.
+        
+        Returns:
+            Dictionary containing all model definitions from config/full_config.json
+        """
+        # Get the extraction models configuration
+        extraction_models_config = self.config_manager.get_extraction_models()
+        
+        # Extract the relevant information for each model
+        models_info = {}
+        for model_config in extraction_models_config:
+            model_name = model_config.get("name")
+            if model_name:
+                models_info[model_name] = {
+                    "description": model_config.get("description", ""),
+                    "fields": model_config.get("fields", {}),
+                    # Include examples if they exist
+                    "examples": model_config.get("examples", [])
+                }
+                
+        return models_info
+        
+    def _create_deduplication_messages(self) -> List[Dict]:
+        """Create example messages for deduplication."""
+        # Load the concise system message from the new prompt file
+        from ..utils.prompt_utils import load_prompt
+        system_content = load_prompt("deduplication_system.md") # Load from new file
+        system_message = {"role": "system", "content": system_content}
+        
+        # For now, we don't include examples as this is a new agent
+        # In the future, examples could be added to the config
+        # Return only the system message for now
+        return [system_message]
 
 
 # Helper function to get extraction models from config manager
