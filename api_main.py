@@ -11,7 +11,7 @@ from pydantic import ValidationError
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.models import AppConfig # Import AppConfig
-from src.extraction.dynamic_agents import DynamicAgentPipelineCoordinator
+from src.extraction.pipeline import DynamicAgentPipelineCoordinator
 from src.utils.display import console, logger # Import logger
 from src.extraction.excel import excel_to_markdown
 from src.utils.error_manager import ErrorManager # Import the new ErrorManager
