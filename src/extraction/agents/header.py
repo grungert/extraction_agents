@@ -47,15 +47,33 @@ class DynamicHeaderValidationAgent:
     def validate(self, header_info: ContextModel, markdown_content: str) -> Optional[ContextModel]:
         # Ensure config_manager is set before creating messages
         if self.config_manager is None:
-             logger.error("Error: Config manager not set for Header Validation Agent.")
-             raise ConfigurationError("Config manager not set for Header Validation Agent.")
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set for Header Validation Agent.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"agent": "DynamicHeaderValidationAgent"}
+             )
 
         # Load messages here, using the dynamically set config_manager
         if not self.messages:
-            self.messages = self._create_validation_messages()
+            try:
+                self.messages = self._create_validation_messages()
+            except ConfigurationError: # Catch specific error from _create_validation_messages
+                raise # Re-raise if it's already a ConfigurationError
+            except Exception as e:
+                # Enhanced Exception for unexpected errors during message creation
+                raise ConfigurationError(
+                    message=f"Failed to create validation messages for Header Validation: {e}",
+                    error_code="HEADER_VALIDATION_MESSAGE_CREATION_FAILED",
+                    context={"agent": "DynamicHeaderValidationAgent", "exception_type": e.__class__.__name__}
+                )
             if not self.messages:
-                 logger.error("Error: Failed to load validation messages for Header Validation.")
-                 raise ConfigurationError("Failed to load validation messages for Header Validation.")
+                 # This case might be redundant if _create_validation_messages raises, but keep for safety
+                 raise ConfigurationError(
+                     message="Failed to load validation messages for Header Validation (empty result).",
+                     error_code="HEADER_VALIDATION_MESSAGES_EMPTY",
+                     context={"agent": "DynamicHeaderValidationAgent"}
+                 )
 
         """
         Validate header detection results against the original table.
@@ -101,10 +119,15 @@ class DynamicHeaderValidationAgent:
                 return None
 
         except LLMInteractionError:
-            raise
+            raise # Re-raise LLMInteractionError
         except Exception as e:
-            logger.exception(f"Error in header validation: {str(e)}")
-            raise ValidationError(f"Error in header validation: {str(e)}")
+            logger.exception(f"Error during header validation: {str(e)}")
+            # Enhanced Exception (wrapping original)
+            raise ValidationError(
+                message=f"Error during header validation: {e}",
+                error_code="HEADER_VALIDATION_RUNTIME_ERROR",
+                context={"exception_type": e.__class__.__name__}
+            )
 
     def _create_validation_messages(self) -> List[Dict]:
         """
@@ -115,9 +138,12 @@ class DynamicHeaderValidationAgent:
         """
         # This method now relies on self.config_manager being set before it's called
         if not self.config_manager:
-             logger.warning("Cannot create header validation examples without config manager.")
-             raise ConfigurationError("Cannot create header validation examples without config manager.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set when creating header validation messages.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"method": "_create_validation_messages"}
+             )
 
         # Get header validation configuration using dot notation
         validation_config: ValidationConfig = self.config_manager.get_validation_config();
@@ -169,17 +195,34 @@ class DynamicHeaderDetectionAgent:
     def detect_headers(self, markdown_content: str) -> Optional[ContextModel]:
         # Ensure config_manager is set before creating messages
         if self.config_manager is None:
-             logger.error("Error: Config manager not set for Header Detection Agent.")
-             raise ConfigurationError("Config manager not set for Header Detection Agent.")
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set for Header Detection Agent.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"agent": "DynamicHeaderDetectionAgent"}
+             )
 
         # Load messages here, using the dynamically set config_manager
         # Check if messages need reloading (if config_manager changed or messages are empty)
         if not self.messages:
-            self.messages = self._create_example_messages()
+            try:
+                self.messages = self._create_example_messages()
+            except ConfigurationError: # Catch specific error from _create_example_messages
+                raise # Re-raise if it's already a ConfigurationError
+            except Exception as e:
+                 # Enhanced Exception for unexpected errors during message creation
+                 raise ConfigurationError(
+                     message=f"Failed to create example messages for Header Detection: {e}",
+                     error_code="HEADER_DETECTION_MESSAGE_CREATION_FAILED",
+                     context={"agent": "DynamicHeaderDetectionAgent", "exception_type": e.__class__.__name__}
+                 )
             if not self.messages:
-                 logger.error("Error: Failed to load example messages for Header Detection.")
-                 raise ConfigurationError("Failed to load example messages for Header Detection.")
-
+                 # This case might be redundant if _create_example_messages raises, but keep for safety
+                 raise ConfigurationError(
+                     message="Failed to load example messages for Header Detection (empty result).",
+                     error_code="HEADER_DETECTION_MESSAGES_EMPTY",
+                     context={"agent": "DynamicHeaderDetectionAgent"}
+                 )
 
         """
         Detect header positions in markdown content.
@@ -225,10 +268,15 @@ class DynamicHeaderDetectionAgent:
                 return None
 
         except LLMInteractionError:
-            raise
+            raise # Re-raise LLMInteractionError
         except Exception as e:
-            logger.exception(f"Error in header detection: {str(e)}")
-            raise ExtractionError(f"Error in header detection: {str(e)}")
+            logger.exception(f"Error during header detection: {str(e)}")
+            # Enhanced Exception (wrapping original)
+            raise ExtractionError(
+                message=f"Error during header detection: {e}",
+                error_code="HEADER_DETECTION_RUNTIME_ERROR",
+                context={"exception_type": e.__class__.__name__}
+            )
 
     def _create_example_messages(self) -> List[Dict]:
         """
@@ -239,9 +287,12 @@ class DynamicHeaderDetectionAgent:
         """
         # This method now relies on self.config_manager being set before it's called
         if not self.config_manager:
-             logger.warning("Cannot create header examples without config manager.")
-             raise ConfigurationError("Cannot create header examples without config manager.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set when creating header detection messages.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"method": "_create_example_messages"}
+             )
 
         # Get header detection configuration using dot notation
         header_config: HeaderDetectionConfig = self.config_manager.get_header_detection_config();

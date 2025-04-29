@@ -83,10 +83,19 @@ def get_formatted_dataframe(file_path, sheet_name, start_row, end_row):
 
             return pd.DataFrame(data)
         except FileNotFoundError:
-            raise FileProcessingError(f"File not found: {file_path}")
+            # Enhanced Exception
+            raise FileProcessingError(
+                message=f"XLSX file not found",
+                error_code="FILE_NOT_FOUND",
+                context={"path": file_path, "sheet": sheet_name}
+            )
         except Exception as e:
-            raise FileProcessingError(f"Error reading XLSX file {file_path}: {e}")
-
+            # Enhanced Exception (wrapping original)
+            raise FileProcessingError(
+                message=f"Error reading XLSX file: {e}",
+                error_code="XLSX_READ_ERROR",
+                context={"path": file_path, "sheet": sheet_name, "exception_type": e.__class__.__name__}
+            )
 
     elif ext == ".xls":
         try:
@@ -115,9 +124,19 @@ def get_formatted_dataframe(file_path, sheet_name, start_row, end_row):
 
             return pd.DataFrame(data)
         except FileNotFoundError:
-            raise FileProcessingError(f"File not found: {file_path}")
+            # Enhanced Exception
+            raise FileProcessingError(
+                message=f"XLS file not found",
+                error_code="FILE_NOT_FOUND",
+                context={"path": file_path, "sheet": sheet_name}
+            )
         except Exception as e:
-            raise FileProcessingError(f"Error reading XLS file {file_path}: {e}")
+            # Enhanced Exception (wrapping original)
+            raise FileProcessingError(
+                message=f"Error reading XLS file: {e}",
+                error_code="XLS_READ_ERROR",
+                context={"path": file_path, "sheet": sheet_name, "exception_type": e.__class__.__name__}
+            )
 
     else:
         # Raise custom FileProcessingError for unsupported format
@@ -163,12 +182,17 @@ def excel_to_markdown(file_path, config: AppConfig, sheet_name=None):
         return result.text_content
 
     except FileProcessingError:
-        # Re-raise custom exception
+        # Re-raise custom exception if already specific
         raise
     except Exception as e:
         # Catch other unexpected errors during markdown conversion
-        logger.exception(f"Error converting file to markdown: {str(e)}") # Use logger.exception
-        raise FileProcessingError(f"Error converting file to markdown: {str(e)}")
+        logger.exception(f"Error converting file to markdown: {str(e)}")
+        # Enhanced Exception (wrapping original)
+        raise FileProcessingError(
+            message=f"Error converting file to markdown: {e}",
+            error_code="MARKDOWN_CONVERSION_FAILED",
+            context={"path": file_path, "exception_type": e.__class__.__name__}
+        )
 
 
 def prepare_excel_sheets_markdown(file_path, config: AppConfig):
@@ -215,9 +239,14 @@ def prepare_excel_sheets_markdown(file_path, config: AppConfig):
             raise FileProcessingError(f"Unsupported file format: {file_path}. Please provide a .csv, .xls, or .xlsx file.")
 
     except FileProcessingError:
-        # Re-raise custom exception
+        # Re-raise custom exception if already specific
         raise
     except Exception as e:
         # Catch other unexpected errors during sheet processing
-        logger.exception(f"Error preparing excel sheets to markdown: {str(e)}") # Use logger.exception
-        raise FileProcessingError(f"Error preparing excel sheets to markdown: {str(e)}")
+        logger.exception(f"Error preparing excel sheets to markdown: {str(e)}")
+        # Enhanced Exception (wrapping original)
+        raise FileProcessingError(
+            message=f"Error preparing excel sheets to markdown: {e}",
+            error_code="SHEET_PREPARATION_FAILED",
+            context={"path": file_path, "exception_type": e.__class__.__name__}
+        )

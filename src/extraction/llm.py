@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import (
-    AIMessage, 
-    BaseMessage, 
-    HumanMessage,  
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
     ToolMessage
 )
 from ..utils.display import console, logger # Ensure logger is imported
@@ -18,6 +18,8 @@ from ..models import (
     Example
     # EXTRACTION_MODELS removed as it's loaded dynamically now
 )
+# Import PipelineException and LLMInteractionError
+from ..exceptions import PipelineException, LLMInteractionError
 from ..config_manager import get_configuration_manager
 from ..dynamic_model_factory import create_extraction_models_dict
 from .agent_utils import get_tokenizer, count_tokens # Ensure token helpers are imported
@@ -25,16 +27,16 @@ from .agent_utils import get_tokenizer, count_tokens # Ensure token helpers are 
 def configure_llm(config: AppConfig):
     """
     Configure the LLM based on application config.
-    
+
     Args:
         config (AppConfig): Application configuration
-        
+
     Returns:
         ChatOpenAI: Configured LLM instance with optional Langfuse monitoring
     """
     # Load environment variables from .env file
     load_dotenv()
-    
+
     # Initialize LLM
     llm = ChatOpenAI(
         model_name=config.model.model_name,
@@ -43,47 +45,48 @@ def configure_llm(config: AppConfig):
         temperature=config.model.temperature,
         max_retries=config.model.max_retries
     )
-    
+
     # Add Langfuse monitoring if enabled in .env
     if os.getenv("LANGFUSE_ENABLED", "false").lower() == "true":
         try:
             from langfuse.callback import CallbackHandler
-            
+
             # Create Langfuse callback handler (will use env vars automatically)
             langfuse_handler = CallbackHandler()
-            
+
             # Test connection (optional, can be removed in production)
             try:
                 langfuse_handler.auth_check()
                 console.print("[green]✓[/green] Langfuse authentication successful")
             except Exception as auth_error:
                 console.print(f"[yellow]⚠[/yellow] Langfuse authentication failed: {str(auth_error)}")
-            
+
             # Add callback handler to LLM
             llm.callbacks = [langfuse_handler]
-            
+
             console.print("[green]✓[/green] Langfuse monitoring enabled")
         except Exception as e:
-            console.print(f"[yellow]⚠[/yellow] Failed to initialize Langfuse: {str(e)}")
-    
+            # Log warning instead of printing directly
+            logger.warning(f"Failed to initialize Langfuse: {str(e)}")
+
     return llm
 
 def configure_llm_classification(config: AppConfig):
     """
     Configure the LLM specifically for classification tasks.
-    
+
     Args:
         config (AppConfig): Application configuration containing classification_model settings
-        
+
     Returns:
         ChatOpenAI: Configured LLM instance for classification
     """
     # Load environment variables from .env file
     load_dotenv()
-    
+
     # Use classification-specific model config
     class_config = config.classification_model
-    
+
     # Initialize LLM
     llm = ChatOpenAI(
         model_name=class_config.model_name,
@@ -92,7 +95,7 @@ def configure_llm_classification(config: AppConfig):
         temperature=class_config.temperature,
         max_retries=class_config.max_retries
     )
-    
+
     # Add Langfuse monitoring if enabled (using the same global setting)
     if os.getenv("LANGFUSE_ENABLED", "false").lower() == "true":
         try:
@@ -100,19 +103,19 @@ def configure_llm_classification(config: AppConfig):
             langfuse_handler = CallbackHandler()
             # No need to auth_check again if done for main LLM
             llm.callbacks = [langfuse_handler]
-            # console.print("[green]✓[/green] Langfuse monitoring enabled for Classification LLM") # Optional log
+            # logger.info("Langfuse monitoring enabled for Classification LLM") # Optional log
         except Exception as e:
-            console.print(f"[yellow]⚠[/yellow] Failed to initialize Langfuse for Classification LLM: {str(e)}")
-            
+            logger.warning(f"Failed to initialize Langfuse for Classification LLM: {str(e)}")
+
     return llm
 
 def create_extraction_prompt(section_name=None):
     """
     Create a prompt template for extraction with optional section focus.
-    
+
     Args:
         section_name (str, optional): If provided, focuses extraction on this specific section
-        
+
     Returns:
         ChatPromptTemplate: Configured prompt template
     """
@@ -126,17 +129,18 @@ def create_extraction_prompt(section_name=None):
 def tool_example_to_messages(example: Example) -> List[BaseMessage]:
     """
     Convert an example into a list of messages that can be fed into an LLM.
-    
+
     Args:
         example (Example): Example with input and expected tool calls
-        
+
     Returns:
         List[BaseMessage]: List of messages for LLM
     """
     try:
-        console.print("[dim]Converting example to messages...[/dim]")
+        # Use logger instead of console.print
+        logger.debug("Converting example to messages...")
         messages: List[BaseMessage] = [HumanMessage(content=example["input"])]
-        
+
         tool_calls = []
         for tool_call in example["tool_calls"]:
             tool_calls.append(
@@ -146,34 +150,38 @@ def tool_example_to_messages(example: Example) -> List[BaseMessage]:
                     "name": tool_call.__class__.__name__,
                 },
             )
-        
+
         messages.append(AIMessage(content="", tool_calls=tool_calls))
-        
+
         tool_outputs = example.get("tool_outputs") or [
             "You have correctly called this tool."
         ] * len(tool_calls)
-        
+
         for output, tool_call in zip(tool_outputs, tool_calls):
             messages.append(ToolMessage(content=output, tool_call_id=tool_call["id"]))
-            
-        console.print(f"[green]Converted example to {len(messages)} messages[/green]")
+
+        logger.debug(f"Converted example to {len(messages)} messages")
         return messages
-        
+
     except Exception as e:
-        console.print(f"[red]Error converting example to messages: {str(e)}[/red]")
-        raise
+        # Wrap unexpected error in a PipelineException
+        raise PipelineException(
+            message=f"Error converting tool example to messages: {e}",
+            error_code="TOOL_EXAMPLE_CONVERSION_FAILED",
+            context={"exception_type": e.__class__.__name__}
+        )
 
 # initialize_llm_pipeline function removed - not used by the dynamic pipeline
 
 def call_llm_with_json_response(prompt, model_class, llm):
     """
     Call the LLM directly with a prompt and parse the JSON response.
-    
+
     Args:
         prompt (str): The complete prompt to send to the LLM
         model_class (Type): Pydantic model class for the expected response
         llm (ChatOpenAI): Configured LLM instance
-        
+
     Returns:
         model_class instance or None: Parsed response or None if parsing failed
     """
@@ -191,21 +199,21 @@ def call_llm_with_json_response(prompt, model_class, llm):
                     )
                     trace_id = trace.id
                 except Exception as e:
-                    console.print(f"[yellow]⚠[/yellow] Failed to create Langfuse trace: {str(e)}")
-    
+                    logger.warning(f"Failed to create Langfuse trace: {str(e)}")
+
     try:
         # Create a direct message to the LLM
         message = HumanMessage(content=prompt)
-        
+
         # Create a runnable specifically for this model
         direct_runnable = llm.with_structured_output(
             schema=model_class,
             include_raw=False,
         )
-        
+
         # Run the extraction
         result = direct_runnable.invoke([message])
-        
+
         # Validate the result structure
         if not hasattr(result, 'model_dump'):
             # End trace with error if it exists
@@ -220,8 +228,13 @@ def call_llm_with_json_response(prompt, model_class, llm):
                             )
                         except Exception:
                             pass
-            return None
-        
+            # Enhanced Exception for invalid structure
+            raise LLMInteractionError(
+                message="LLM returned invalid result structure in direct call.",
+                error_code="LLM_INVALID_RESULT_STRUCTURE",
+                context={"model_class": model_class.__name__}
+            )
+
         # End trace with success if it exists
         if trace_id:
             for callback in llm.callbacks:
@@ -233,9 +246,9 @@ def call_llm_with_json_response(prompt, model_class, llm):
                         )
                     except Exception:
                         pass
-            
+
         return result
-        
+
     except Exception as e:
         # Log error to trace if it exists
         if trace_id:
@@ -249,9 +262,13 @@ def call_llm_with_json_response(prompt, model_class, llm):
                         )
                     except Exception:
                         pass
-        
-        console.print(f"[red]Error in direct LLM call: {str(e)}[/red]")
-        return None
+        # Enhanced Exception for runtime errors during LLM call
+        # Wrap original exception
+        raise LLMInteractionError(
+            message=f"Error during direct LLM call: {e}",
+            error_code="LLM_DIRECT_CALL_FAILED",
+            context={"model_class": model_class.__name__, "exception_type": e.__class__.__name__}
+        )
 
 
 def extract_section(markdown_content, section_name, model_class, messages, llm):
@@ -364,7 +381,12 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                             )
                         except Exception:
                             pass
-            return None
+            # Enhanced Exception for invalid structure
+            raise LLMInteractionError(
+                message=f"LLM returned invalid result structure for section '{section_name}'.",
+                error_code="LLM_INVALID_RESULT_STRUCTURE",
+                context={"section": section_name, "model_class": model_class.__name__}
+            )
 
         # End trace with success if it exists
         if trace_id:
@@ -394,5 +416,15 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                     except Exception:
                         pass
 
-        logger.exception(f"Error extracting {section_name}: {str(e)}") # Use logger.exception
-        return None
+        # Enhanced Exception for runtime errors during section extraction
+        # Wrap original exception
+        # Note: logger.exception removed as ErrorManager will handle logging
+        raise LLMInteractionError(
+            message=f"Error extracting section '{section_name}': {e}",
+            error_code="LLM_SECTION_EXTRACTION_FAILED",
+            context={
+                "section": section_name,
+                "model_class": model_class.__name__,
+                "exception_type": e.__class__.__name__
+            }
+        )

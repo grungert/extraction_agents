@@ -58,9 +58,12 @@ class DynamicExtractionAgent:
 
         # Ensure config_manager is set
         if self.config_manager is None:
-             logger.error(f"Error: Config manager not set for Extraction Agent ({section_name}).")
-             raise ConfigurationError(f"Config manager not set for Extraction Agent ({section_name}).")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message=f"Configuration manager not set for Extraction Agent.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"agent": "DynamicExtractionAgent", "section": section_name}
+             )
 
         try:
             # Focus on relevant rows based on header detection
@@ -71,11 +74,24 @@ class DynamicExtractionAgent:
 
             # Get or create example messages for this section, using the dynamically set config_manager
             if section_name not in self.section_messages or not self.section_messages[section_name]:
-                self.section_messages[section_name] = self._create_section_messages(section_name, self.app_config)
-                if not self.section_messages[section_name]:
-                     logger.error(f"Error: Failed to load messages for {section_name} extraction.")
-                     raise ConfigurationError(f"Failed to load messages for {section_name} extraction.")
-
+                try:
+                    self.section_messages[section_name] = self._create_section_messages(section_name, self.app_config)
+                except ConfigurationError: # Catch specific error from _create_section_messages
+                    raise # Re-raise if it's already a ConfigurationError
+                except Exception as e:
+                    # Enhanced Exception for unexpected errors during message creation
+                    raise ConfigurationError(
+                        message=f"Failed to create section messages for extraction: {e}",
+                        error_code="EXTRACTION_MESSAGE_CREATION_FAILED",
+                        context={"agent": "DynamicExtractionAgent", "section": section_name, "exception_type": e.__class__.__name__}
+                    )
+                if not self.section_messages.get(section_name):
+                     # This case might be redundant if _create_section_messages raises, but keep for safety
+                     raise ConfigurationError(
+                         message=f"Failed to load messages for extraction (empty result).",
+                         error_code="EXTRACTION_MESSAGES_EMPTY",
+                         context={"agent": "DynamicExtractionAgent", "section": section_name}
+                     )
 
             # Extract data
             result = extract_section(
@@ -94,10 +110,15 @@ class DynamicExtractionAgent:
                 return None
 
         except LLMInteractionError:
-            raise
+            raise # Re-raise LLMInteractionError
         except Exception as e:
-            logger.exception(f"Error in {section_name} extraction: {str(e)}")
-            raise ExtractionError(f"Error in {section_name} extraction: {str(e)}")
+            logger.exception(f"Error during {section_name} extraction: {str(e)}")
+            # Enhanced Exception (wrapping original)
+            raise ExtractionError(
+                message=f"Error during {section_name} extraction: {e}",
+                error_code="EXTRACTION_RUNTIME_ERROR",
+                context={"section": section_name, "exception_type": e.__class__.__name__}
+            )
 
     def _focus_content(self, markdown_content: str, header_info: ContextModel) -> str:
         """
@@ -136,9 +157,12 @@ class DynamicExtractionAgent:
         """
         # This method relies on self.config_manager being set
         if not self.config_manager:
-             logger.warning(f"Cannot create section messages for {section_name} without config manager.")
-             raise ConfigurationError(f"Cannot create section messages for {section_name} without config manager.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message=f"Configuration manager not set when creating section messages.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"method": "_create_section_messages", "section": section_name}
+             )
 
         # Load system message template from prompt file, passing necessary context
         from ...utils.prompt_utils import load_template_prompt

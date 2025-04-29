@@ -8,13 +8,20 @@ from pathlib import Path
 try:
     from ..models import AppConfig
     from ..config_manager import ConfigurationManager, get_configuration_manager
+    # Import custom exceptions
+    from ..exceptions import ConfigurationError, PipelineException
 except ImportError:
     # Handle cases where this might be run standalone or structure differs
     AppConfig = None
     ConfigurationManager = None
     get_configuration_manager = None
+    ConfigurationError = Exception # Fallback if custom exceptions aren't available
+    PipelineException = Exception
 
 PROMPT_DIR = Path(__file__).resolve().parent.parent / "prompts"
+# Get logger instance
+import logging
+logger = logging.getLogger(__name__)
 
 def load_prompt(file_name: str) -> str:
     """
@@ -30,8 +37,19 @@ def load_prompt(file_name: str) -> str:
         with open(PROMPT_DIR / file_name, 'r') as f:
             return f.read()
     except FileNotFoundError:
-        print(f"Error: Prompt file '{file_name}' not found in {PROMPT_DIR}")
-        return ""
+        # Enhanced Exception
+        raise ConfigurationError(
+            message=f"Prompt file not found",
+            error_code="PROMPT_FILE_NOT_FOUND",
+            context={"filename": file_name, "directory": str(PROMPT_DIR)}
+        )
+    except Exception as e:
+        # Enhanced Exception for other read errors
+        raise PipelineException(
+            message=f"Error reading prompt file '{file_name}': {e}",
+            error_code="PROMPT_FILE_READ_ERROR",
+            context={"filename": file_name, "exception_type": e.__class__.__name__}
+        )
 
 
 def load_template_prompt(
@@ -108,9 +126,18 @@ def load_template_prompt(
         # Use standard Python string formatting
         return template_string.format(**format_args)
     except KeyError as e:
-        print(f"Error formatting template '{file_name}': Missing key {e}")
-        print(f"Available keys: {list(format_args.keys())}")
-        return template_string # Return unformatted template on error
+        logger.error(f"Error formatting template '{file_name}': Missing key {e}. Available keys: {list(format_args.keys())}")
+        # Enhanced Exception for formatting errors
+        raise PipelineException(
+            message=f"Missing key '{e}' when formatting prompt template '{file_name}'",
+            error_code="PROMPT_FORMATTING_MISSING_KEY",
+            context={"filename": file_name, "missing_key": str(e), "available_keys": list(format_args.keys())}
+        )
     except Exception as e:
-        print(f"Error formatting template '{file_name}': {e}")
-        return template_string # Return unformatted template on error
+        logger.error(f"Error formatting template '{file_name}': {e}")
+        # Enhanced Exception for other formatting errors
+        raise PipelineException(
+            message=f"Error formatting prompt template '{file_name}': {e}",
+            error_code="PROMPT_FORMATTING_ERROR",
+            context={"filename": file_name, "exception_type": e.__class__.__name__}
+        )

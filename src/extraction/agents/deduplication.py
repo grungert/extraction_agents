@@ -48,17 +48,33 @@ class DynamicDeduplicationAgent:
         """
         # Ensure config_manager is set
         if self.config_manager is None:
-             logger.error("Error: Config manager not set for Deduplication Agent.")
-             raise ConfigurationError("Config manager not set for Deduplication Agent.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set for Deduplication Agent.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"agent": "DynamicDeduplicationAgent"}
+             )
 
         try:
             # Get the Pydantic model definitions from config (uses self.config_manager)
-            pydantic_models = self._get_pydantic_models()
+            try:
+                pydantic_models = self._get_pydantic_models()
+            except ConfigurationError: # Catch specific error from _get_pydantic_models
+                raise # Re-raise if it's already a ConfigurationError
+            except Exception as e:
+                 # Enhanced Exception for unexpected errors during model definition loading
+                 raise ConfigurationError(
+                     message=f"Failed to get Pydantic models for deduplication: {e}",
+                     error_code="DEDUPLICATION_MODEL_LOAD_FAILED",
+                     context={"agent": "DynamicDeduplicationAgent", "exception_type": e.__class__.__name__}
+                 )
             if not pydantic_models:
-                 logger.error("Error: Failed to get Pydantic models for deduplication.")
-                 raise ConfigurationError("Failed to get Pydantic models for deduplication.")
-
+                 # This case might be redundant if _get_pydantic_models raises, but keep for safety
+                 raise ConfigurationError(
+                     message="Failed to get Pydantic models for deduplication (empty result).",
+                     error_code="DEDUPLICATION_MODELS_EMPTY",
+                     context={"agent": "DynamicDeduplicationAgent"}
+                 )
 
             # Convert inputs to formatted strings for the LLM
             extraction_json = json.dumps(extraction_results, indent=2)
@@ -94,12 +110,24 @@ class DynamicDeduplicationAgent:
 
             # Load messages if not already loaded for this run
             if not self.messages:
-                 self.messages = self._create_deduplication_messages()
+                 try:
+                     self.messages = self._create_deduplication_messages()
+                 except ConfigurationError: # Catch specific error from _create_deduplication_messages
+                     raise # Re-raise if it's already a ConfigurationError
+                 except Exception as e:
+                     # Enhanced Exception for unexpected errors during message creation
+                     raise ConfigurationError(
+                         message=f"Failed to create messages for Deduplication: {e}",
+                         error_code="DEDUPLICATION_MESSAGE_CREATION_FAILED",
+                         context={"agent": "DynamicDeduplicationAgent", "exception_type": e.__class__.__name__}
+                     )
                  if not self.messages:
-                      logger.error("Error: Failed to load messages for Deduplication.")
-                      # Assuming prompt_filename is still in scope from load_prompt above
-                      raise ConfigurationError(f"Deduplication system prompt file '{instruction_prompt_filename}' not found.")
-
+                      # This case might be redundant if _create_deduplication_messages raises, but keep for safety
+                      raise ConfigurationError(
+                          message="Failed to load messages for Deduplication (empty result).",
+                          error_code="DEDUPLICATION_MESSAGES_EMPTY",
+                          context={"agent": "DynamicDeduplicationAgent"}
+                      )
 
             # Call extract_section with the structured messages
             # self.messages now contains the concise system prompt loaded just-in-time
@@ -119,10 +147,15 @@ class DynamicDeduplicationAgent:
                 return None
 
         except LLMInteractionError:
-            raise
+            raise # Re-raise LLMInteractionError
         except Exception as e:
-            logger.exception(f"Error in deduplication: {str(e)}")
-            raise DeduplicationError(f"Error in deduplication: {str(e)}")
+            logger.exception(f"Error during deduplication: {str(e)}")
+            # Enhanced Exception (wrapping original)
+            raise DeduplicationError(
+                message=f"Error during deduplication: {e}",
+                error_code="DEDUPLICATION_RUNTIME_ERROR",
+                context={"exception_type": e.__class__.__name__}
+            )
 
     def _create_detailed_schema(self, pydantic_models: Dict) -> Dict:
         """
@@ -219,9 +252,12 @@ class DynamicDeduplicationAgent:
         """
         # This method relies on self.config_manager being set
         if not self.config_manager:
-             logger.warning("Cannot get pydantic models without config manager.")
-             raise ConfigurationError("Cannot get pydantic models without config manager.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message="Configuration manager not set when getting pydantic models.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"method": "_get_pydantic_models"}
+             )
 
         # Get the extraction models configuration using dot notation
         extraction_models_config = self.config_manager.get_extraction_models()
@@ -251,9 +287,12 @@ class DynamicDeduplicationAgent:
         try:
             system_content = load_prompt(prompt_filename)
         except FileNotFoundError:
-             logger.error(f"Error: Deduplication system prompt file '{prompt_filename}' not found.")
-             raise ConfigurationError(f"Deduplication system prompt file '{prompt_filename}' not found.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message=f"Deduplication system prompt file not found",
+                 error_code="PROMPT_FILE_NOT_FOUND",
+                 context={"filename": prompt_filename}
+             )
 
         system_message = {"role": "system", "content": system_content}
 

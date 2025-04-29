@@ -14,9 +14,10 @@ from src.models import AppConfig # Import AppConfig
 from src.extraction.dynamic_agents import DynamicAgentPipelineCoordinator
 from src.utils.display import console, logger # Import logger
 from src.extraction.excel import excel_to_markdown
+from src.utils.error_manager import ErrorManager # Import the new ErrorManager
 
 # Import custom exceptions
-from src.exceptions import ( # Import custom exceptions
+from src.exceptions import (
     PipelineException,
     ConfigurationError,
     FileProcessingError,
@@ -103,30 +104,16 @@ async def extract_excel(
 
         return JSONResponse(content=results)
 
-    except FileProcessingError as e: # Catch custom FileProcessingError
-        logger.error(f"File processing error during extraction: {e}")
-        raise HTTPException(status_code=400, detail=f"File Processing Error: {e}")
-    except ConfigurationError as e: # Catch custom ConfigurationError
-        logger.error(f"Configuration error during pipeline execution: {e}")
-        raise HTTPException(status_code=400, detail=f"Configuration Error: {e}")
-    except LLMInteractionError as e: # Catch custom LLMInteractionError
-        logger.error(f"LLM interaction error during pipeline execution: {e}")
-        raise HTTPException(status_code=500, detail=f"LLM Interaction Error: {e}")
-    except ExtractionError as e: # Catch custom ExtractionError
-        logger.error(f"Extraction error during pipeline execution: {e}")
-        raise HTTPException(status_code=500, detail=f"Extraction Error: {e}")
-    except CustomValidationError as e: # Catch custom ValidationError (aliased)
-        logger.error(f"Validation error during pipeline execution: {e}")
-        raise HTTPException(status_code=400, detail=f"Validation Error: {e}")
-    except DeduplicationError as e: # Catch custom DeduplicationError
-        logger.error(f"Deduplication error during pipeline execution: {e}")
-        raise HTTPException(status_code=500, detail=f"Deduplication Error: {e}")
-    except PipelineException as e: # Catch any other custom PipelineExceptions
-        logger.exception(f"A pipeline exception occurred: {e}")
-        raise HTTPException(status_code=500, detail=f"Pipeline Error: {e}")
-    except Exception as e: # Catch any other unexpected errors
-        logger.exception(f"An unexpected error occurred during extraction: {str(e)}") # Use logger.exception for traceback
-        raise HTTPException(status_code=500, detail=f"An internal error occurred: {e}")
+    # --- Updated Exception Handling using ErrorManager ---
+    except Exception as e:
+        # Use ErrorManager to handle logging and formatting
+        error_response = ErrorManager.handle_exception(e, log_traceback=True)
+        # Use ErrorManager to map exception to HTTP status code
+        status_code = ErrorManager.map_exception_to_http_status(e)
+        # Raise HTTPException with the standardized response and status code
+        raise HTTPException(status_code=status_code, detail=error_response)
+    # --- End Updated Exception Handling ---
+
     finally:
         # Clean up the temporary file
         if os.path.exists(temp_file_path):

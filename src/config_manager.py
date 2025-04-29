@@ -15,7 +15,7 @@ from .models import (
 )
 
 # Import custom exceptions
-from .exceptions import ConfigurationError, FileProcessingError # Import ConfigurationError
+from .exceptions import ConfigurationError, FileProcessingError, PipelineException # Import enhanced exceptions
 
 class ConfigurationManager:
     """Manager for loading and validating configuration from JSON using Pydantic models."""
@@ -36,8 +36,7 @@ class ConfigurationManager:
         Load and validate the configuration from a JSON file using Pydantic.
 
         Raises:
-            ConfigurationError: If the configuration file is not found, invalid JSON, or fails Pydantic validation
-            RuntimeError: For other unexpected errors during loading/validation
+            ConfigurationError: If the configuration file is not found, invalid JSON, or fails Pydantic validation.
         """
         try:
             with open(self.config_path, 'r') as f:
@@ -45,19 +44,40 @@ class ConfigurationManager:
             # Use Pydantic model for validation and structuring
             self.config = ExtractionConfig(**config_data)
         except FileNotFoundError:
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Configuration file not found: {self.config_path}")
+            raise ConfigurationError(
+                message=f"Configuration file not found",
+                error_code="CONFIG_FILE_NOT_FOUND",
+                context={"path": self.config_path}
+            )
         except json.JSONDecodeError as e:
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Invalid JSON in configuration file: {str(e)}")
+            raise ConfigurationError(
+                message=f"Invalid JSON in configuration file: {e}",
+                error_code="CONFIG_INVALID_JSON",
+                context={"path": self.config_path, "error_details": str(e)}
+            )
         except PydanticValidationError as e:
-            # Raise custom ConfigurationError with validation details
-            raise ConfigurationError(f"Configuration validation failed in {self.config_path}:\n{e}")
+            raise ConfigurationError(
+                message=f"Configuration validation failed",
+                error_code="CONFIG_VALIDATION_FAILED",
+                context={"path": self.config_path, "validation_errors": str(e)}
+            )
         except Exception as e:
-            # Catch any other unexpected errors during loading/validation and raise as RuntimeError
-            # Keep RuntimeError for truly unexpected issues not related to config format/existence
-            raise RuntimeError(f"An unexpected error occurred while loading configuration from {self.config_path}: {e}")
+            # Catch any other unexpected errors during loading/validation
+            raise ConfigurationError(
+                message=f"An unexpected error occurred while loading configuration: {e}",
+                error_code="CONFIG_UNEXPECTED_LOAD_ERROR",
+                context={"path": self.config_path, "exception_type": e.__class__.__name__}
+            )
 
+    def _ensure_config_loaded(self):
+        """Raise an error if the configuration hasn't been loaded."""
+        if self.config is None:
+             # This should ideally not happen if __init__ succeeded, but good practice
+             raise ConfigurationError(
+                 message="Configuration accessed before successful loading.",
+                 error_code="CONFIG_NOT_LOADED",
+                 severity=PipelineException.CRITICAL # This indicates a programming error
+             )
 
     def get_header_detection_config(self) -> HeaderDetectionConfig:
         """
@@ -66,8 +86,7 @@ class ConfigurationManager:
         Returns:
             HeaderDetectionConfig instance
         """
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.header_detection
 
     def get_header_examples(self) -> List[Dict[str, Any]]:
@@ -77,9 +96,10 @@ class ConfigurationManager:
         Returns:
             List of header example dictionaries
         """
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
-        return self.config.header_detection.examples
+        self._ensure_config_loaded()
+        # Ensure examples exist, return empty list if not (or raise if required)
+        return getattr(self.config.header_detection, 'examples', [])
+
 
     def get_validation_config(self) -> ValidationConfig:
         """
@@ -88,50 +108,42 @@ class ConfigurationManager:
         Returns:
             ValidationConfig instance
         """
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.validation
 
     def get_prompts_config(self) -> PromptsConfig:
         """Get the prompts configuration section."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts
 
     def get_header_detection_prompt_file(self) -> str:
         """Get the filename for the header detection system prompt."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.header_detection_system_prompt_file
 
     def get_header_validation_prompt_file(self) -> str:
         """Get the filename for the header validation system prompt."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.header_validation_system_prompt_file
 
     def get_deduplication_system_prompt_file(self) -> str:
         """Get the filename for the deduplication system prompt."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.deduplication_system_prompt_file
 
     def get_deduplication_instruction_prompt_file(self) -> str:
         """Get the filename for the deduplication instruction prompt."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.deduplication_instruction_prompt_file
 
     def get_section_extraction_template_file(self) -> str:
         """Get the filename for the section extraction template."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.section_extraction_template_file
 
     def get_section_validation_template_file(self) -> str:
         """Get the filename for the section validation template."""
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.prompts.section_validation_template_file
 
 
@@ -142,8 +154,7 @@ class ConfigurationManager:
         Returns:
             List of ExtractionModelDefinition instances
         """
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         return self.config.extraction_models
 
     def get_model_by_name(self, name: str) -> Optional[ExtractionModelDefinition]:
@@ -156,11 +167,11 @@ class ConfigurationManager:
         Returns:
             ExtractionModelDefinition instance, or None if not found
         """
-        if self.config is None:
-             raise RuntimeError("Configuration not loaded.")
+        self._ensure_config_loaded()
         for model in self.config.extraction_models:
             if model.name == name:
                 return model
+        # Return None if not found, let caller handle it or raise specific error
         return None
 
     def get_model_fields(self, name: str) -> Dict[str, FieldDefinition]:
@@ -178,8 +189,11 @@ class ConfigurationManager:
         """
         model = self.get_model_by_name(name)
         if model is None:
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Model definition not found in configuration: {name}")
+            raise ConfigurationError(
+                message=f"Model definition not found in configuration",
+                error_code="CONFIG_MODEL_NOT_FOUND",
+                context={"model_name": name, "config_path": self.config_path}
+            )
         return model.fields
 
     def get_model_examples(self, name: str) -> List[Dict[str, Any]]:
@@ -197,9 +211,13 @@ class ConfigurationManager:
         """
         model = self.get_model_by_name(name)
         if model is None:
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Model definition not found in configuration: {name}")
-        return model.examples
+            raise ConfigurationError(
+                message=f"Model definition not found in configuration",
+                error_code="CONFIG_MODEL_NOT_FOUND",
+                 context={"model_name": name, "config_path": self.config_path}
+            )
+        # Ensure examples exist, return empty list if not
+        return getattr(model, 'examples', [])
 
 
 def get_configuration_manager(config_path: str) -> ConfigurationManager:
@@ -213,13 +231,26 @@ def get_configuration_manager(config_path: str) -> ConfigurationManager:
         ConfigurationManager instance
 
     Raises:
-        ConfigurationError: If the configuration file is not found or invalid
-        RuntimeError: For other unexpected errors during loading
+        ConfigurationError: If the configuration file is not found or invalid.
     """
     # Check if path exists before creating manager
     if not os.path.exists(config_path):
-         # Raise custom ConfigurationError
-         raise ConfigurationError(f"Configuration file specified does not exist: {config_path}")
+         raise ConfigurationError(
+             message=f"Configuration file specified does not exist",
+             error_code="CONFIG_FILE_NOT_FOUND",
+             context={"path": config_path}
+         )
 
-    # ConfigurationManager now handles loading and Pydantic validation internally
-    return ConfigurationManager(config_path)
+    # ConfigurationManager constructor now handles loading, validation, and specific errors
+    try:
+        return ConfigurationManager(config_path)
+    except ConfigurationError:
+        # Re-raise ConfigurationError directly
+        raise
+    except Exception as e:
+        # Wrap unexpected errors during instantiation
+        raise ConfigurationError(
+            message=f"Unexpected error creating ConfigurationManager: {e}",
+            error_code="CONFIG_MANAGER_INIT_FAILED",
+            context={"path": config_path, "exception_type": e.__class__.__name__}
+        )

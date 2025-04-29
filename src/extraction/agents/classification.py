@@ -38,9 +38,12 @@ class DynamicClassificationAgent:
             from langchain.prompts import ChatPromptTemplate
             return ChatPromptTemplate.from_template(prompt_text)
         except FileNotFoundError:
-            logger.error(f"Classification prompt file '{prompt_file_name}' not found.")
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Classification prompt file '{prompt_file_name}' not found.")
+            # Enhanced Exception
+            raise ConfigurationError(
+                message=f"Classification prompt file not found",
+                error_code="PROMPT_FILE_NOT_FOUND",
+                context={"filename": prompt_file_name}
+            )
 
     def _prepare_input_text(self, markdown_content: str, doc_name: str) -> str:
         """Truncates markdown content based on token limits."""
@@ -145,8 +148,12 @@ class DynamicClassificationAgent:
             elif isinstance(llm_response, str):
                  llm_response_text = llm_response
             else:
-                 # Raise custom LLMInteractionError
-                 raise LLMInteractionError(f"Unexpected LLM response type: {type(llm_response)}")
+                 # Enhanced Exception
+                 raise LLMInteractionError(
+                     message=f"Unexpected LLM response type during classification",
+                     error_code="LLM_UNEXPECTED_RESPONSE_TYPE",
+                     context={"doc_name": doc_name, "response_type": type(llm_response).__name__}
+                 )
 
             parsed_data = self._parse_response(llm_response_text)
 
@@ -163,9 +170,13 @@ class DynamicClassificationAgent:
             # Re-raise custom exception
             raise
         except Exception as e:
-            logger.exception(f"Error during classification: {e}")
-            # Raise custom ExtractionError (or a more specific ClassificationError if we create one)
-            raise ExtractionError(f"Error during classification: {e}")
+            logger.exception(f"Error during classification for doc '{doc_name}': {e}")
+            # Enhanced Exception (wrapping original)
+            raise ExtractionError(
+                message=f"Error during classification: {e}",
+                error_code="CLASSIFICATION_RUNTIME_ERROR",
+                context={"doc_name": doc_name, "exception_type": e.__class__.__name__}
+            )
 
 
 class DynamicClassificationValidationAgent:
@@ -184,9 +195,12 @@ class DynamicClassificationValidationAgent:
             from langchain.prompts import ChatPromptTemplate
             return ChatPromptTemplate.from_template(prompt_text)
         except FileNotFoundError:
-            logger.error(f"Classification validation prompt file '{prompt_file_name}' not found.")
-            # Raise custom ConfigurationError
-            raise ConfigurationError(f"Classification validation prompt file '{prompt_file_name}' not found.")
+            # Enhanced Exception
+            raise ConfigurationError(
+                message=f"Classification validation prompt file not found",
+                error_code="PROMPT_FILE_NOT_FOUND",
+                context={"filename": prompt_file_name}
+            )
 
     def _prepare_input_text(self, markdown_content: str, doc_name: str, previous_class: str) -> str:
         """Truncates markdown content based on token limits for validation prompt."""
@@ -290,8 +304,12 @@ class DynamicClassificationValidationAgent:
             elif isinstance(llm_response, str):
                  llm_response_text = llm_response
             else:
-                 # Raise custom LLMInteractionError
-                 raise LLMInteractionError(f"Unexpected LLM response type: {type(llm_response)}")
+                 # Enhanced Exception
+                 raise LLMInteractionError(
+                     message=f"Unexpected LLM response type during classification validation",
+                     error_code="LLM_UNEXPECTED_RESPONSE_TYPE",
+                     context={"doc_name": doc_name, "response_type": type(llm_response).__name__}
+                 )
 
             parsed_data = self._parse_response(llm_response_text)
 
@@ -312,6 +330,10 @@ class DynamicClassificationValidationAgent:
             # Re-raise custom exception
             raise
         except Exception as e:
-            logger.exception(f"Error during classification validation: {e}")
-            # Raise custom ValidationError (or a more specific ClassificationValidationError)
-            raise ValidationError(f"Error during classification validation: {e}")
+            logger.exception(f"Error during classification validation for doc '{doc_name}': {e}")
+            # Enhanced Exception (wrapping original)
+            raise ValidationError(
+                message=f"Error during classification validation: {e}",
+                error_code="CLASSIFICATION_VALIDATION_RUNTIME_ERROR",
+                context={"doc_name": doc_name, "exception_type": e.__class__.__name__}
+            )

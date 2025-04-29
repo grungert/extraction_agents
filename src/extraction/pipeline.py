@@ -87,13 +87,21 @@ class DynamicAgentPipelineCoordinator:
         try:
             classification_output = self.classification_agent.run(markdown_content, doc_name)
             if not classification_output:
-                logger.error("Classification failed. Stopping pipeline.")
-                raise ExtractionError("Classification failed.")
+                # Enhanced Exception
+                raise ExtractionError(
+                    message="Classification agent failed to return output.",
+                    error_code="CLASSIFICATION_AGENT_FAILED",
+                    context={"doc_name": doc_name}
+                )
 
             validation_output = self.classification_validation_agent.run(markdown_content, doc_name, classification_output)
             if not validation_output:
-                logger.error("Classification validation failed. Stopping pipeline.")
-                raise ValidationError("Classification validation failed.")
+                # Enhanced Exception
+                raise ValidationError(
+                    message="Classification validation agent failed to return output.",
+                    error_code="CLASSIFICATION_VALIDATION_FAILED",
+                    context={"doc_name": doc_name, "initial_class": classification_output.predicted_class}
+                )
 
 
             logger.info(f"Classification Validated: Class='{validation_output.predicted_class}', Confidence='{validation_output.confidence}', Reason='{validation_output.validation_reason}'")
@@ -144,9 +152,24 @@ class DynamicAgentPipelineCoordinator:
                     # Re-raise custom exception
                     raise
                 except Exception as e:
-                     logger.exception(f"Error loading config or models from {config_path}: {e}")
-                     raise ConfigurationError(f"Failed to load config/models for {validated_class}: {e}")
-
+                     # Enhanced Exception (wrapping original)
+                     # Keep original ConfigurationError from get_configuration_manager if possible,
+                     # but wrap other exceptions.
+                     if isinstance(e, ConfigurationError):
+                         # Re-raise if it's already a ConfigurationError with context
+                         raise
+                     else:
+                         logger.exception(f"Unexpected error loading config or models from {config_path}: {e}")
+                         raise ConfigurationError(
+                             message=f"Failed to load config/models for class '{validated_class}': {e}",
+                             error_code="CONFIG_LOAD_FAILED_FOR_CLASS",
+                             context={
+                                 "doc_name": doc_name,
+                                 "classified_class": validated_class,
+                                 "config_path": config_path,
+                                 "exception_type": e.__class__.__name__
+                             }
+                         )
 
                 logger.info(f"Proceeding with extraction for class '{validated_class}' using '{config_path}'")
 
@@ -160,9 +183,12 @@ class DynamicAgentPipelineCoordinator:
                 header_info = self.header_agent.detect_headers(markdown_content)
 
                 if not header_info:
-                    logger.error("Header detection failed")
-                    raise ExtractionError("Header detection failed.")
-
+                    # Enhanced Exception
+                    raise ExtractionError(
+                        message="Header detection agent failed to return header info.",
+                        error_code="HEADER_DETECTION_FAILED",
+                        context={"doc_name": doc_name, "classified_class": validated_class}
+                    )
 
                 # Step: Header Validation
                 self.header_validation_agent.config_manager = self.config_manager
@@ -174,11 +200,20 @@ class DynamicAgentPipelineCoordinator:
                 validation_config: ValidationConfig = self.config_manager.get_validation_config()
                 header_confidence_threshold = validation_config.confidence_threshold
 
-                if not validated_header_info or (hasattr(validated_header_info, 'ValidationConfidence') and
-                                                 validated_header_info.ValidationConfidence < header_confidence_threshold):
-                    logger.error("Header validation failed or has low confidence")
-                    raise ValidationError("Header validation failed or has low confidence.")
+                header_confidence = getattr(validated_header_info, 'ValidationConfidence', None)
 
+                if not validated_header_info or (header_confidence is not None and header_confidence < header_confidence_threshold):
+                    # Enhanced Exception
+                    raise ValidationError(
+                        message="Header validation failed or confidence below threshold.",
+                        error_code="HEADER_VALIDATION_LOW_CONFIDENCE",
+                        context={
+                            "doc_name": doc_name,
+                            "classified_class": validated_class,
+                            "confidence_score": header_confidence,
+                            "threshold": header_confidence_threshold
+                        }
+                    )
 
                 header_info = validated_header_info
                 header_confidence = validated_header_info.ValidationConfidence if hasattr(validated_header_info, 'ValidationConfidence') else 0.7
@@ -277,10 +312,17 @@ class DynamicAgentPipelineCoordinator:
             raise
         except Exception as e:
             # Catch any other unexpected exceptions during the pipeline run
-            logger.exception(f"An unexpected error occurred during pipeline execution: {e}")
-            # Raise a generic PipelineException for unhandled errors
-            raise PipelineException(f"An unexpected error occurred during pipeline execution: {e}")
-
+            logger.exception(f"An unexpected error occurred during pipeline execution for {doc_name}: {e}")
+            # Raise a generic PipelineException for unhandled errors, adding context
+            raise PipelineException(
+                message=f"An unexpected error occurred during pipeline execution: {e}",
+                error_code="PIPELINE_UNEXPECTED_ERROR",
+                context={
+                    "doc_name": doc_name,
+                    "classified_class": validated_class if 'validated_class' in locals() else "Unknown",
+                    "exception_type": e.__class__.__name__
+                }
+            )
 
         # --- Final processing (runs only if class was not "None of those" and config was found) ---
         end_time = time.perf_counter()

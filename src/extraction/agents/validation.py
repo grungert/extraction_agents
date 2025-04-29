@@ -59,9 +59,12 @@ class DynamicValidationAgent:
 
         # Ensure config_manager is set
         if self.config_manager is None:
-             logger.error(f"Error: Config manager not set for Validation Agent ({section_name}).")
-             raise ConfigurationError(f"Config manager not set for Validation Agent ({section_name}).")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message=f"Configuration manager not set for Validation Agent.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"agent": "DynamicValidationAgent", "section": section_name}
+             )
 
         try:
             # Focus on relevant rows based on header detection (same as extraction)
@@ -90,11 +93,24 @@ class DynamicValidationAgent:
 
             # Get or create example messages for this section, using dynamic config_manager
             if section_name not in self.section_messages or not self.section_messages[section_name]:
-                self.section_messages[section_name] = self._create_section_validation_messages(section_name, self.app_config)
-                if not self.section_messages[section_name]:
-                     logger.error(f"Error: Failed to load messages for {section_name} validation.")
-                     raise ConfigurationError(f"Failed to load messages for {section_name} validation.")
-
+                try:
+                    self.section_messages[section_name] = self._create_section_validation_messages(section_name, self.app_config)
+                except ConfigurationError: # Catch specific error from _create_section_validation_messages
+                    raise # Re-raise if it's already a ConfigurationError
+                except Exception as e:
+                    # Enhanced Exception for unexpected errors during message creation
+                    raise ConfigurationError(
+                        message=f"Failed to create section messages for validation: {e}",
+                        error_code="VALIDATION_MESSAGE_CREATION_FAILED",
+                        context={"agent": "DynamicValidationAgent", "section": section_name, "exception_type": e.__class__.__name__}
+                    )
+                if not self.section_messages.get(section_name):
+                     # This case might be redundant if _create_section_validation_messages raises, but keep for safety
+                     raise ConfigurationError(
+                         message=f"Failed to load messages for validation (empty result).",
+                         error_code="VALIDATION_MESSAGES_EMPTY",
+                         context={"agent": "DynamicValidationAgent", "section": section_name}
+                     )
 
             # Validate data using section-specific messages
             result = extract_section(
@@ -113,10 +129,15 @@ class DynamicValidationAgent:
                 return None
 
         except LLMInteractionError:
-            raise
+            raise # Re-raise LLMInteractionError
         except Exception as e:
-            logger.exception(f"Error in {section_name} validation: {str(e)}")
-            raise ValidationError(f"Error in {section_name} validation: {str(e)}")
+            logger.exception(f"Error during {section_name} validation: {str(e)}")
+            # Enhanced Exception (wrapping original)
+            raise ValidationError(
+                message=f"Error during {section_name} validation: {e}",
+                error_code="VALIDATION_RUNTIME_ERROR",
+                context={"section": section_name, "exception_type": e.__class__.__name__}
+            )
 
     def _focus_content(self, markdown_content: str, header_info: ContextModel) -> str:
         """
@@ -174,9 +195,12 @@ class DynamicValidationAgent:
         """
         # This method relies on self.config_manager being set
         if not self.config_manager:
-             logger.warning(f"Cannot create section validation messages for {section_name} without config manager.")
-             raise ConfigurationError(f"Cannot create section validation messages for {section_name} without config manager.")
-
+             # Enhanced Exception
+             raise ConfigurationError(
+                 message=f"Configuration manager not set when creating section validation messages.",
+                 error_code="CONFIG_MANAGER_NOT_SET",
+                 context={"method": "_create_section_validation_messages", "section": section_name}
+             )
 
         # Load system message template from prompt file, passing necessary context
         from ...utils.prompt_utils import load_template_prompt
