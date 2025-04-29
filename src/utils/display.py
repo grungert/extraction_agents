@@ -1,47 +1,52 @@
-"""Display utilities for Excel Header Mapper."""
+"""Display and logging utilities for Excel Header Mapper."""
+import logging
+import sys
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.logging import RichHandler # Import RichHandler for better console logging
 
-# Initialize rich console
+# Initialize rich console for general output
 console = Console()
 
-def create_summary_table(title, header_columns, rows, title_style="bold"):
-    """
-    Create a summary table with the given data.
-    
-    Args:
-        title (str): The table title
-        header_columns (list): List of (name, style) tuples for columns where style can be a color or None
-        rows (list): List of row data
-        title_style (str): Style for the title
-        
-    Returns:
-        Table: A rich Table object
-    """
-    table = Table(title=f"[{title_style}]{title}[/{title_style}]", 
-                 show_header=True, 
-                 header_style="bold magenta")
-    
-    # Add columns
-    for name, style in header_columns:
-        # Check if style might be a justification direction
-        if style in ["right", "center", "left"]:
-            table.add_column(name, justify=style)
-        else:
-            table.add_column(name, style=style)
-    
-    # Add rows
-    for row in rows:
-        table.add_row(*[str(cell) for cell in row])
-    
-    return table
+# Configure logging
+# Create a logger
+logger = logging.getLogger("excel_extraction_pipeline")
+logger.setLevel(logging.INFO) # Set minimum logging level
 
-def create_progress_panel(message, title=None, subtitle=None, style="green"):
-    """Create a panel with progress information."""
-    return Panel(
-        message,
-        title=title,
-        subtitle=subtitle,
-        border_style=style
-    )
+# Create handlers
+# Use RichHandler for console output
+console_handler = RichHandler(
+    console=console, # Use the existing rich console
+    show_time=True,
+    show_path=False, # Hide path for cleaner output
+    keywords=["Error", "Warning", "Configuration Error", "Runtime Error"] # Highlight key terms
+)
+console_handler.setLevel(logging.INFO) # Set minimum level for console output
+
+# Create a formatter (optional, RichHandler has a default)
+# formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# console_handler.setFormatter(formatter)
+
+# Add handlers to the logger
+# Prevent duplicate handlers if the module is reloaded
+if not logger.handlers:
+    logger.addHandler(console_handler)
+
+# You can add other handlers here, e.g., FileHandler for logging to a file
+# file_handler = logging.FileHandler("pipeline.log")
+# file_handler.setLevel(logging.ERROR) # Log only errors and above to file
+# file_handler.setFormatter(formatter)
+# logger.addHandler(file_handler)
+
+# Example usage:
+# logger.info("This is an informational message.")
+# logger.warning("This is a warning message.")
+# logger.error("This is an error message.")
+# logger.exception("This is an error with traceback.") # Use inside an except block
+
+# Keep the rich console for non-logging display like tables and panels
+# console.print("This is a general message using console.print")
+
+# Export the logger for use in other modules
+__all__ = ["console", "logger", "create_summary_table", "create_progress_panel"]

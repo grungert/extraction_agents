@@ -11,7 +11,7 @@ with open('config/classifier_test_config.json', 'r') as f:
 LLM_MODEL_NAME = config["llm_choosen4classification"]
 LM_STUDIO_URL = config['lm_studio_url']
 LLM_MAX_TOKENS = config['llm_max_tokens'] 
-MAX_PROMPT_TOKEN_PERCENTAGE = 0.45
+MAX_PROMPT_TOKEN_PERCENTAGE = config['max_prompt_token_percentage']
 LLM_CONFIG = {
     "temperature": config["llm_temperature"],
     "max_tokens": config["llm_max_tokens"],

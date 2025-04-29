@@ -2,7 +2,6 @@ import os
 import json
 from src.models import AppConfig
 from src.config_manager import ConfigurationManager
-from src.extraction.dynamic_agents import DynamicAgentPipelineCoordinator
 from src.extraction.excel import excel_to_markdown
 
 def run_extraction(file_path: str, config_dict: dict, sheet_name: str = None) -> dict:

@@ -1,251 +1,225 @@
 """Configuration manager for the dynamically configurable extraction system."""
 import os
 import json
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Type, Union
+from pydantic import ValidationError as PydanticValidationError # Import Pydantic's ValidationError
+
+# Import the new Pydantic models for configuration
+from .models import (
+    ExtractionConfig,
+    HeaderDetectionConfig,
+    ValidationConfig,
+    ExtractionModelDefinition,
+    PromptsConfig,
+    FieldDefinition
+)
+
+# Import custom exceptions
+from .exceptions import ConfigurationError, FileProcessingError # Import ConfigurationError
 
 class ConfigurationManager:
-    """Manager for loading and validating configuration from JSON."""
-    
+    """Manager for loading and validating configuration from JSON using Pydantic models."""
+
     def __init__(self, config_path: str):
         """
         Initialize the configuration manager.
-        
+
         Args:
             config_path: Path to the JSON configuration file
         """
         self.config_path = config_path
-        self.config = self._load_config()
-        self._validate_config()
-    
-    def _load_config(self) -> Dict[str, Any]:
+        self.config: Optional[ExtractionConfig] = None # Store as Pydantic model
+        self._load_and_validate_config()
+
+    def _load_and_validate_config(self) -> None:
         """
-        Load the configuration from a JSON file.
-        
-        Returns:
-            Dictionary containing configuration
-        
+        Load and validate the configuration from a JSON file using Pydantic.
+
         Raises:
-            FileNotFoundError: If the configuration file is not found
-            json.JSONDecodeError: If the configuration file is not valid JSON
+            ConfigurationError: If the configuration file is not found, invalid JSON, or fails Pydantic validation
+            RuntimeError: For other unexpected errors during loading/validation
         """
         try:
             with open(self.config_path, 'r') as f:
-                config = json.load(f)
-            return config
+                config_data = json.load(f)
+            # Use Pydantic model for validation and structuring
+            self.config = ExtractionConfig(**config_data)
         except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file not found: {self.config_path}")
+            # Raise custom ConfigurationError
+            raise ConfigurationError(f"Configuration file not found: {self.config_path}")
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file: {str(e)}")
-    
-    def _validate_config(self) -> None:
-        """
-        Validate the configuration.
-        
-        Raises:
-            ValueError: If the configuration is invalid
-        """
-        errors = []
-        
-        # Check required sections
-        if "extraction_models" not in self.config:
-            errors.append("Missing required section: extraction_models")
-        elif not isinstance(self.config["extraction_models"], list):
-            errors.append("extraction_models must be a list")
-        
-        # Check header detection section
-        if "header_detection" not in self.config:
-            errors.append("Missing required section: header_detection")
-        elif not isinstance(self.config["header_detection"], dict):
-            errors.append("header_detection must be a dictionary")
-        
-        # Check validation section
-        if "validation" not in self.config:
-            errors.append("Missing required section: validation")
-        elif not isinstance(self.config["validation"], dict):
-            errors.append("validation must be a dictionary")
-        
-        # Check extraction models
-        if "extraction_models" in self.config and isinstance(self.config["extraction_models"], list):
-            model_names = set()
-            
-            for i, model in enumerate(self.config["extraction_models"]):
-                # Check required model keys
-                if "name" not in model:
-                    errors.append(f"Model at index {i} is missing required key: name")
-                elif not isinstance(model["name"], str):
-                    errors.append(f"Model name at index {i} must be a string")
-                else:
-                    if model["name"] in model_names:
-                        errors.append(f"Duplicate model name: {model['name']}")
-                    model_names.add(model["name"])
-                
-                # Check fields
-                if "fields" not in model:
-                    errors.append(f"Model {model.get('name', f'at index {i}')} is missing required key: fields")
-                elif not isinstance(model["fields"], dict):
-                    errors.append(f"Model fields for {model.get('name', f'at index {i}')} must be a dictionary")
-                else:
-                    for field_name, field in model["fields"].items():
-                        if not isinstance(field, dict):
-                            errors.append(f"Field {field_name} in model {model.get('name', f'at index {i}')} must be a dictionary")
-                        else:
-                            if "description" not in field:
-                                errors.append(f"Field {field_name} in model {model.get('name', f'at index {i}')} is missing required key: description")
-                
-                # Check examples
-                if "examples" not in model:
-                    errors.append(f"Model {model.get('name', f'at index {i}')} is missing required key: examples")
-                elif not isinstance(model["examples"], list):
-                    errors.append(f"Model examples for {model.get('name', f'at index {i}')} must be a list")
-                else:
-                    for j, example in enumerate(model["examples"]):
-                        if "table" not in example:
-                            errors.append(f"Example at index {j} in model {model.get('name', f'at index {i}')} is missing required key: table")
-                        if "expected" not in example:
-                            errors.append(f"Example at index {j} in model {model.get('name', f'at index {i}')} is missing required key: expected")
-        
-        if errors:
-            raise ValueError("\n".join(errors))
-    
-    def get_header_detection_config(self) -> Dict[str, Any]:
+            # Raise custom ConfigurationError
+            raise ConfigurationError(f"Invalid JSON in configuration file: {str(e)}")
+        except PydanticValidationError as e:
+            # Raise custom ConfigurationError with validation details
+            raise ConfigurationError(f"Configuration validation failed in {self.config_path}:\n{e}")
+        except Exception as e:
+            # Catch any other unexpected errors during loading/validation and raise as RuntimeError
+            # Keep RuntimeError for truly unexpected issues not related to config format/existence
+            raise RuntimeError(f"An unexpected error occurred while loading configuration from {self.config_path}: {e}")
+
+
+    def get_header_detection_config(self) -> HeaderDetectionConfig:
         """
         Get the header detection configuration.
-        
+
         Returns:
-            Dictionary containing header detection configuration
+            HeaderDetectionConfig instance
         """
-        return self.config.get("header_detection", {}).get("config", {})
-    
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.header_detection
+
     def get_header_examples(self) -> List[Dict[str, Any]]:
         """
         Get the header detection examples.
-        
+
         Returns:
             List of header example dictionaries
         """
-        return self.config.get("header_detection", {}).get("examples", [])
-    
-    def get_validation_config(self) -> Dict[str, Any]:
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.header_detection.examples
+
+    def get_validation_config(self) -> ValidationConfig:
         """
         Get the validation configuration.
-        
+
         Returns:
-            Dictionary containing validation configuration
+            ValidationConfig instance
         """
-        return self.config.get("validation", {})
-        
-    def get_prompts_config(self) -> Dict[str, str]:
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.validation
+
+    def get_prompts_config(self) -> PromptsConfig:
         """Get the prompts configuration section."""
-        return self.config.get('prompts', {})
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts
 
     def get_header_detection_prompt_file(self) -> str:
         """Get the filename for the header detection system prompt."""
-        # Provide a default fallback if not specified in config
-        return self.get_prompts_config().get('header_detection_system_prompt_file', 'header_detection_system_v1.md') 
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.header_detection_system_prompt_file
 
     def get_header_validation_prompt_file(self) -> str:
         """Get the filename for the header validation system prompt."""
-        # Provide a default fallback if not specified in config
-        # Note: Moved this getter here from validation config for consistency
-        return self.get_validation_config().get('header_validation_prompt_file', 'header_validation_system_v1.md')
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.header_validation_system_prompt_file
 
     def get_deduplication_system_prompt_file(self) -> str:
         """Get the filename for the deduplication system prompt."""
-        return self.get_prompts_config().get('deduplication_system_prompt_file', 'deduplication_system.md')
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.deduplication_system_prompt_file
 
     def get_deduplication_instruction_prompt_file(self) -> str:
         """Get the filename for the deduplication instruction prompt."""
-        return self.get_prompts_config().get('deduplication_instruction_prompt_file', 'deduplication_agent.md')
-        
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.deduplication_instruction_prompt_file
+
     def get_section_extraction_template_file(self) -> str:
         """Get the filename for the section extraction template."""
-        return self.get_prompts_config().get('section_extraction_template_file', 'section_extraction_system_template.md')
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.section_extraction_template_file
 
     def get_section_validation_template_file(self) -> str:
         """Get the filename for the section validation template."""
-        return self.get_prompts_config().get('section_validation_template_file', 'section_validation_system_template.md')
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.prompts.section_validation_template_file
 
-    def get_extraction_models(self) -> List[Dict[str, Any]]:
+
+    def get_extraction_models(self) -> List[ExtractionModelDefinition]:
         """
         Get the extraction model definitions.
-        
+
         Returns:
-            List of dictionaries containing model definitions
+            List of ExtractionModelDefinition instances
         """
-        return self.config.get("extraction_models", [])
-    
-    def get_model_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        return self.config.extraction_models
+
+    def get_model_by_name(self, name: str) -> Optional[ExtractionModelDefinition]:
         """
         Get a model definition by name.
-        
+
         Args:
             name: Name of the model
-            
+
         Returns:
-            Dictionary containing model definition, or None if not found
+            ExtractionModelDefinition instance, or None if not found
         """
-        for model in self.get_extraction_models():
-            if model.get("name") == name:
+        if self.config is None:
+             raise RuntimeError("Configuration not loaded.")
+        for model in self.config.extraction_models:
+            if model.name == name:
                 return model
         return None
-    
-    def get_model_fields(self, name: str) -> Dict[str, Dict[str, Any]]:
+
+    def get_model_fields(self, name: str) -> Dict[str, FieldDefinition]:
         """
         Get the fields for a model.
-        
+
         Args:
             name: Name of the model
-            
+
         Returns:
-            Dictionary mapping field names to field definitions
-            
+            Dictionary mapping field names to FieldDefinition instances
+
         Raises:
-            ValueError: If the model is not found
+            ConfigurationError: If the model is not found
         """
         model = self.get_model_by_name(name)
         if model is None:
-            raise ValueError(f"Model not found: {name}")
-        return model.get("fields", {})
-    
+            # Raise custom ConfigurationError
+            raise ConfigurationError(f"Model definition not found in configuration: {name}")
+        return model.fields
+
     def get_model_examples(self, name: str) -> List[Dict[str, Any]]:
         """
         Get the examples for a model.
-        
+
         Args:
             name: Name of the model
-            
+
         Returns:
             List of dictionaries containing examples
-            
+
         Raises:
-            ValueError: If the model is not found
+            ConfigurationError: If the model is not found
         """
         model = self.get_model_by_name(name)
         if model is None:
-            raise ValueError(f"Model not found: {name}")
-        return model.get("examples", [])
+            # Raise custom ConfigurationError
+            raise ConfigurationError(f"Model definition not found in configuration: {name}")
+        return model.examples
 
 
-def get_configuration_manager(config_path: str) -> ConfigurationManager: # Made config_path non-optional
+def get_configuration_manager(config_path: str) -> ConfigurationManager:
     """
     Get a configuration manager instance.
-    
+
     Args:
         config_path: Path to the configuration file (required)
-        
+
     Returns:
         ConfigurationManager instance
-        
-    Raises:
-        ValueError: If config_path is None (though type hint prevents this)
-        FileNotFoundError: If the specified config_path does not exist
-    """
-    if config_path is None: 
-        # This check is technically redundant due to type hint, but good practice
-        raise ValueError("Configuration path must be provided to get_configuration_manager.")
-    
-    # Check if path exists before creating manager 
-    if not os.path.exists(config_path):
-         raise FileNotFoundError(f"Configuration file specified does not exist: {config_path}")
 
+    Raises:
+        ConfigurationError: If the configuration file is not found or invalid
+        RuntimeError: For other unexpected errors during loading
+    """
+    # Check if path exists before creating manager
+    if not os.path.exists(config_path):
+         # Raise custom ConfigurationError
+         raise ConfigurationError(f"Configuration file specified does not exist: {config_path}")
+
+    # ConfigurationManager now handles loading and Pydantic validation internally
     return ConfigurationManager(config_path)

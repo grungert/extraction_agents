@@ -1,6 +1,7 @@
 """LLM extraction utilities for Excel Header Mapper."""
 import os
 import uuid
+import json # Added json import
 from typing import List, Any
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
@@ -11,14 +12,15 @@ from langchain_core.messages import (
     HumanMessage,  
     ToolMessage
 )
-from ..utils.display import console
+from ..utils.display import console, logger # Ensure logger is imported
 from ..models import (
-    AppConfig, 
+    AppConfig,
     Example
     # EXTRACTION_MODELS removed as it's loaded dynamically now
 )
 from ..config_manager import get_configuration_manager
 from ..dynamic_model_factory import create_extraction_models_dict
+from .agent_utils import get_tokenizer, count_tokens # Ensure token helpers are imported
 
 def configure_llm(config: AppConfig):
     """
@@ -255,14 +257,14 @@ def call_llm_with_json_response(prompt, model_class, llm):
 def extract_section(markdown_content, section_name, model_class, messages, llm):
     """
     Extract a specific section using a specific model.
-    
+
     Args:
         markdown_content (str): Input markdown content to extract from
         section_name (str): Name of the section to extract
         model_class (BaseModel): Pydantic model class for this section
         messages (List): Example messages for the LLM
         llm (ChatOpenAI): Configured LLM instance
-        
+
     Returns:
         BaseModel or None: Extracted data or None if extraction failed
     """
@@ -281,18 +283,18 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                     )
                     trace_id = trace.id
                 except Exception as e:
-                    console.print(f"[yellow]⚠[/yellow] Failed to create Langfuse trace: {str(e)}")
-    
+                    logger.warning(f"Failed to create Langfuse trace: {str(e)}") # Use logger.warning
+
     try:
         # Create a section-specific prompt
         section_prompt = create_extraction_prompt(section_name)
-        
+
         # Create a runnable specifically for this model
         section_runnable = section_prompt | llm.with_structured_output(
             schema=model_class,
             include_raw=False,
         )
-        
+
         # Extract system message and examples from the input 'messages' list
         system_prompt_obj = None
         example_messages = []
@@ -304,7 +306,7 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                 example_messages = messages[1:] # The rest are examples
             else: # Assume no system message provided, all are examples
                 example_messages = messages
-                
+
         # Prepare invocation dictionary
         invoke_input = {
             "text": markdown_content, # This is the user/human message content
@@ -318,9 +320,36 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
             from langchain_core.messages import SystemMessage
             invoke_input["system_message"] = [SystemMessage(content="You are a helpful assistant.")]
 
+        # --- NEW: Accurate Input Token Counting ---
+        # Reconstruct the full prompt text to count tokens accurately
+        full_prompt_text = ""
+        if system_prompt_obj:
+            full_prompt_text += system_prompt_obj.content + "\n" # Add system message content
+        for msg in example_messages:
+             # Assuming example messages are HumanMessage and AIMessage
+             if isinstance(msg, HumanMessage):
+                  full_prompt_text += msg.content + "\n"
+             elif isinstance(msg, AIMessage):
+                  full_prompt_text += msg.content + "\n" # Or format as needed
+             elif isinstance(msg, dict) and 'content' in msg: # Handle dict format if necessary
+                  full_prompt_text += msg['content'] + "\n"
+
+        full_prompt_text += markdown_content # Add the main human input
+
+        input_tokens = count_tokens(get_tokenizer(), full_prompt_text)
+        logger.info(f"LLM Call Input Tokens ({section_name}): {input_tokens}")
+        # --- END NEW ---
+
+
         # Run the extraction
         result = section_runnable.invoke(invoke_input)
-        
+
+        # --- NEW: Accurate Output Token Counting ---
+        output_tokens = count_tokens(get_tokenizer(), json.dumps(result.model_dump()) if result else "")
+        logger.info(f"LLM Call Output Tokens ({section_name}): {output_tokens}")
+        # --- END NEW ---
+
+
         # Validate the result structure
         if not hasattr(result, 'model_dump'):
             # End trace with error if it exists
@@ -336,7 +365,7 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                         except Exception:
                             pass
             return None
-        
+
         # End trace with success if it exists
         if trace_id:
             for callback in llm.callbacks:
@@ -348,9 +377,9 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                         )
                     except Exception:
                         pass
-            
+
         return result
-        
+
     except Exception as e:
         # Log error to trace if it exists
         if trace_id:
@@ -364,6 +393,6 @@ def extract_section(markdown_content, section_name, model_class, messages, llm):
                         )
                     except Exception:
                         pass
-        
-        console.print(f"[red]Error extracting {section_name}: {str(e)}[/red]")
+
+        logger.exception(f"Error extracting {section_name}: {str(e)}") # Use logger.exception
         return None

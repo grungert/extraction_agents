@@ -1,0 +1,42 @@
+{
+  "input_dir": "input",
+  "output_dir": "json_outputs",
+  "start_row": 0,
+  "end_row": 15,
+  "all_sheets": false,
+  "model": {
+    "model_name": "llama-3.2-3b-instruct",
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "null",
+    "temperature": 0.2,
+    "max_retries": 2,
+    "context_window": null
+  },
+  "classification_model": {
+    "model_name": "claude2-alpaca-7b",
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "null",
+    "temperature": 0.3,
+    "max_tokens": 4000,
+    "context_window_percentage": 0.45,
+    "max_retries": 2,
+    "context_window": null
+  },
+  "include_header_examples_in_prompt": true,
+  "enable_deduplication_agent": true,
+  "classification_prompt": "classifier_agent_v2_2.md",
+  "classification_validation_prompt": "classifier_validation_agent_v1.md",
+  "classification_labels": [
+    "Mutual Funds",
+    "ETF",
+    "Stocks",
+    "Bonds",
+    "Real State",
+    "Crypto Asset",
+    "Commodities",
+    "Private Equities",
+    "Index",
+    "Currencies Pairs",
+    "None of those"
+  ]
+}
