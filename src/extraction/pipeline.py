@@ -81,10 +81,17 @@ class DynamicAgentPipelineCoordinator:
         ordered_results = OrderedDict()
         start_time = time.perf_counter()  # Start timer
 
-        # --- NEW: Classification Steps ---
+        # --- Step Tracking ---
+        current_step = 0
+        total_steps = 0 # Will be calculated later
+
+        # --- Classification Steps ---
         doc_name = os.path.splitext(os.path.basename(source_file))[0] if source_file else "Unknown Document"
 
         try:
+            # Step 1: Classification
+            current_step += 1
+            logger.info(f"--- Starting Pipeline Step {current_step}: Document Classification ---")
             classification_output = self.classification_agent.run(markdown_content, doc_name)
             if not classification_output:
                 # Enhanced Exception
@@ -94,6 +101,9 @@ class DynamicAgentPipelineCoordinator:
                     context={"doc_name": doc_name}
                 )
 
+            # Step 2: Classification Validation
+            current_step += 1
+            logger.info(f"--- Starting Pipeline Step {current_step}: Classification Validation ---")
             validation_output = self.classification_validation_agent.run(markdown_content, doc_name, classification_output)
             if not validation_output:
                 # Enhanced Exception
@@ -103,8 +113,7 @@ class DynamicAgentPipelineCoordinator:
                     context={"doc_name": doc_name, "initial_class": classification_output.predicted_class}
                 )
 
-
-            logger.info(f"Classification Validated: Class='{validation_output.predicted_class}', Confidence='{validation_output.confidence}', Reason='{validation_output.validation_reason}'")
+            logger.info(f"Classification Validated: Class='{validation_output.predicted_class}', Confidence='{validation_output.confidence}'") # Removed Reason as it might be long
 
             # Store classification result
             ordered_results["Classification"] = validation_output.model_dump()
@@ -173,9 +182,17 @@ class DynamicAgentPipelineCoordinator:
 
                 logger.info(f"Proceeding with extraction for class '{validated_class}' using '{config_path}'")
 
+                # --- Calculate Total Steps ---
+                num_extraction_sections = len(self.extraction_models)
+                deduplication_step = 1 if self.config.enable_deduplication_agent else 0
+                total_steps = 2 + 2 + (2 * num_extraction_sections) + deduplication_step # Class+Val, Head+Val, Extract+Val pairs, Dedupe
+                logger.info(f"Calculated Total Steps for '{validated_class}': {total_steps}")
+
                 # --- Existing Pipeline Steps (Now run for any valid class with a config file) ---
 
-                # Step: Header Detection
+                # Step 3: Header Detection
+                current_step += 1
+                logger.info(f"--- Starting Pipeline Step {current_step} of {total_steps}: Header Detection ---")
                 # Pass config manager to agent instance for this run
                 self.header_agent.config_manager = self.config_manager
                 # Reload messages based on new config - use dot notation for prompt file
@@ -190,7 +207,9 @@ class DynamicAgentPipelineCoordinator:
                         context={"doc_name": doc_name, "classified_class": validated_class}
                     )
 
-                # Step: Header Validation
+                # Step 4: Header Validation
+                current_step += 1
+                logger.info(f"--- Starting Pipeline Step {current_step} of {total_steps}: Header Validation ---")
                 self.header_validation_agent.config_manager = self.config_manager
                 # Reload messages - use dot notation for prompt file
                 self.header_validation_agent.messages = self.header_validation_agent._create_validation_messages()
@@ -232,7 +251,8 @@ class DynamicAgentPipelineCoordinator:
                 }
                 ordered_results["Context"] = context_data
 
-                # Step: Section Extraction & Validation
+                # Step 5 onwards: Section Extraction & Validation
+                logger.info(f"--- Starting Section Processing Phase (Steps {current_step + 1} to {current_step + (2 * num_extraction_sections)}) ---")
                 # Pass config manager to agents for this run
                 self.extraction_agent.config_manager = self.config_manager
                 self.validation_agent.config_manager = self.config_manager
@@ -243,9 +263,14 @@ class DynamicAgentPipelineCoordinator:
                 results = {}
                 # Use dot notation for extraction confidence threshold
                 extraction_confidence_threshold = validation_config.confidence_threshold # Assuming same threshold for extraction validation
+                section_index = 0 # To track progress within this phase
                 for section_name, model_class in self.extraction_models.items():
+                    section_index += 1
                     results[section_name] = {k: None for k in model_class.model_fields.keys() if k != 'ValidationConfidence'} # Init without confidence field
 
+                    # Step 5.1, 5.3, etc.: Extraction
+                    current_step += 1
+                    logger.info(f"--- Starting Step {current_step} of {total_steps}: Extracting Section {section_index}/{num_extraction_sections} ('{section_name}') ---")
                     extracted_data = self.extraction_agent.extract_data(
                         markdown_content, header_info, section_name, model_class
                     )
@@ -253,8 +278,15 @@ class DynamicAgentPipelineCoordinator:
                     if not extracted_data:
                         logger.warning(f"No data extracted for {section_name}")
                         results[section_name]['ValidationConfidence'] = 0.0 # Mark as low confidence if extraction failed
+                        # Skip validation for this section if extraction failed
+                        logger.warning(f"Skipping validation for section '{section_name}' due to extraction failure.")
+                        # Need to increment step counter even if skipping validation part
+                        current_step += 1
                         continue
 
+                    # Step 5.2, 5.4, etc.: Validation
+                    current_step += 1
+                    logger.info(f"--- Starting Step {current_step} of {total_steps}: Validating Section {section_index}/{num_extraction_sections} ('{section_name}') ---")
                     validated_result = self.validation_agent.validate(
                         extracted_data, markdown_content, header_info, section_name, model_class
                     )
@@ -288,11 +320,13 @@ class DynamicAgentPipelineCoordinator:
                 for section_name, section_data in results.items():
                     ordered_results[section_name] = section_data
 
-                # Step: Deduplication
+                # Step: Deduplication (Final step if enabled)
                 if self.config.enable_deduplication_agent:
+                    current_step += 1
+                    logger.info(f"--- Starting Pipeline Step {current_step} of {total_steps}: Deduplication ---")
                     # Pass config manager for this run
                     self.deduplication_agent.config_manager = self.config_manager
-                    logger.info("Running deduplication agent to resolve header conflicts...")
+                    # logger.info("Running deduplication agent to resolve header conflicts...") # Redundant with step log
                     deduplication_result = self.deduplication_agent.deduplicate(
                         ordered_results, markdown_content
                     )
