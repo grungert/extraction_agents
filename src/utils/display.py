@@ -8,14 +8,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.logging import RichHandler  # Import RichHandler for better console logging
 
-# Initialize rich console for general output
-console = Console()
-
-# Configure logging
-# Create a logger
-logger = logging.getLogger("excel_extraction_pipeline")
-logger.setLevel(logging.INFO)  # Set minimum logging level
-
+# Custom formatter to remove logger name and format exception
 class CustomFormatter(logging.Formatter):
     def formatException(self, record):
         s = super().formatException(record)
@@ -30,6 +23,14 @@ class CustomFormatter(logging.Formatter):
             s = s + ' | Exception: ' + self.formatException(record)
         return s
 
+# Initialize rich console for general output
+console = Console()
+
+# Configure logging
+# Create a logger
+logger = logging.getLogger("excel_extraction_pipeline")
+logger.setLevel(logging.INFO)  # Set minimum logging level
+
 # Create handlers
 # Use RichHandler for console output
 console_handler = RichHandler(
@@ -38,16 +39,19 @@ console_handler = RichHandler(
     show_path=False,  # Hide path for cleaner output
     keywords=["Error", "Warning", "Configuration Error", "Runtime Error"]  # Highlight key terms
 )
+#logger.setLevel(logging.DEBUG)               # allow everything to flow down
 console_handler.setLevel(logging.INFO)  # Set minimum level for console output
 
 # Create a rotating file handler
-log_file_path = "pipeline.log"  # Default log file path
+log_file_path = os.path.join(os.getcwd(), "logs/pipeline.log")  # Default log file path
 # Rotate logs daily
 file_handler = TimedRotatingFileHandler(log_file_path, when="D", interval=1, backupCount=7)
+#file_handler.setLevel(logging.INFO)  # Log only errors and above to file
 file_handler.setLevel(logging.ERROR)  # Log only errors and above to file
+#file_handler.setLevel(logging.INFO)  # Log only info and above to file
 
 # Apply the custom formatter
-formatter = CustomFormatter('%(asctime)s - %(message)s')
+formatter = CustomFormatter('%(asctime)s - %(levelname)s - %(message)s')
 console_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
 
