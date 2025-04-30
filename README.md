@@ -205,18 +205,11 @@ flowchart TD
 
 ## To do
 
-* **Address duplicate header data resulting from separate group extractions.**
-    * *Problem:* Data extraction is currently performed separately for each data group. Consequently, the same header information can appear in multiple extracted groups.
-    * *Task:* Define a method to handle this redundancy (e.g., consolidate, deduplicate) after the initial extraction phase.
-
 * **Access to the Hill git**
 
 * **Ground truth status**
 
 * **Add ollama integration**
-
-* **Agent csv to markdown table**
-    * Create agent if csv dont have table infor to convert table to markdown
 
 * **Add information about type of extraction**
 
@@ -239,6 +232,8 @@ It can be:
 
 * **Review security considerations.**
 
-* **Define deployment procedures.**
-
 * **Conduct a full dynamism review.**
+
+* **Create swagger api documentation.**
+
+* **Create meeting with Nikola about implementation code in prod.**
