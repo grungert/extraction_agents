@@ -347,6 +347,12 @@ class DynamicAgentPipelineCoordinator:
         except Exception as e:
             # Catch any other unexpected exceptions during the pipeline run
             logger.exception(f"An unexpected error occurred during pipeline execution for {doc_name}: {e}")
+            # Force flush after logging the exception
+            try:
+                for handler in logger.handlers:
+                    handler.flush()
+            except Exception as flush_e:
+                print(f"Error flushing log handlers: {flush_e}")
             # Raise a generic PipelineException for unhandled errors, adding context
             raise PipelineException(
                 message=f"An unexpected error occurred during pipeline execution: {e}",

@@ -209,8 +209,6 @@ flowchart TD
 
 * **Ground truth status**
 
-* **Add ollama integration**
-
 * **Add information about type of extraction**
 
 It can be:
@@ -237,3 +235,5 @@ It can be:
 * **Create swagger api documentation.**
 
 * **Create meeting with Nikola about implementation code in prod.**
+
+* **Montioring system use https://github.com/langfuse/langfuse**
